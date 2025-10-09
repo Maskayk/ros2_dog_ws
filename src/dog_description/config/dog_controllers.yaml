@@ -1,0 +1,27 @@
+controller_manager:
+  ros__parameters:
+    update_rate: 100
+
+joint_state_broadcaster:
+  type: joint_state_broadcaster/JointStateBroadcaster
+  publish_rate: 50
+
+position_trajectory_controller:
+  type: position_controllers/JointTrajectoryController
+  joints:
+    - front_left_hip_joint
+    - front_left_thigh_joint
+    - front_left_shin_joint
+    - front_right_hip_joint
+    - front_right_thigh_joint
+    - front_right_shin_joint
+    - rear_left_hip_joint
+    - rear_left_thigh_joint
+    - rear_left_shin_joint
+    - rear_right_hip_joint
+    - rear_right_thigh_joint
+    - rear_right_shin_joint
+  state_publish_rate: 50
+  segments: 4
+  constraints:
+    goal_time: 0.6
