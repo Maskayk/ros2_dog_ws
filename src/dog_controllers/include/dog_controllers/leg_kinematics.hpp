@@ -1,27 +1,28 @@
 #pragma once
-#include <cmath>
 #include <array>
+#include <cmath>
+#include <stdexcept>
+
+struct leg_limits
+{
+  double yaw_min, yaw_max;
+  double hip_min, hip_max;
+  double knee_min, knee_max;
+};
 
 class LegKinematics3DOF
 {
 public:
-  LegKinematics3DOF(double L1, double L2)
-  : L1_(L1), L2_(L2) {}
+  LegKinematics3DOF(double L1, double L2);
 
-  std::array<double, 3> inverse(double x, double y, double z)
-  {
-    double yaw = atan2(y, x);
-    double xy = sqrt(x*x + y*y);
-    double d = sqrt(xy*xy + z*z);
-    if (d > (L1_ + L2_)) d = L1_ + L2_;
+  std::array<double, 3> inverse(const std::array<double, 3>& p) const;
 
-    double alpha = atan2(z, xy);
-    double beta = acos((L1_*L1_ + d*d - L2_*L2_) / (2*L1_*d));
-    double hip = alpha - beta;
-    double knee = M_PI - acos((L1_*L1_ + L2_*L2_ - d*d) / (2*L1_*L2_));
+  std::array<std::array<double,3>, 3> jacobian(const std::array<double,3>& q) const;
 
-    return {yaw, hip, knee};
-  }
+  static double clamp(double v, double lo, double hi);
+
+  double L1() const;
+  double L2() const;
 
 private:
   double L1_, L2_;
