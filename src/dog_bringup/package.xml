@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>dog_bringup</name>
+  <version>0.1.0</version>
+  <description>Launch and bringup files for quadruped simulation.</description>
+
+  <maintainer email="you@example.com">Matvey</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>rclpy</depend>
+  <depend>ros2launch</depend>
+  <depend>gazebo_ros</depend>
+  <depend>xacro</depend>
+  <depend>controller_manager</depend>
+  <depend>joint_state_broadcaster</depend>
+  <depend>position_controllers</depend>
+  <depend>ros2_control</depend>
+  <depend>dog_description</depend>
+  <depend>dog_controllers</depend>
+  <depend>dog_hardware</depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

@@ -40,7 +40,7 @@ std::array<double, 3> LegKinematics3DOF::inverse(const std::array<double, 3>& p)
 
   double cos_k = (L1_*L1_ + L2_*L2_ - d*d) / (2.0 * L1_ * L2_);
   cos_k = std::clamp(cos_k, -1.0, 1.0);
-  double knee = M_PI - std::acos(cos_k);  // ← тут у тебя раньше была ошибка с минусом!
+  double knee = M_PI - std::acos(cos_k); 
 
   return {yaw, hip, knee};
 }
@@ -75,6 +75,6 @@ double LegKinematics3DOF::clamp(double v, double lo, double hi)
   if (v > hi) return hi;
   return v;
 }
-
+  
 double LegKinematics3DOF::L1() const { return L1_; }
 double LegKinematics3DOF::L2() const { return L2_; }

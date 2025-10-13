@@ -115,7 +115,6 @@
     <joint name="${name}_shin_joint" type="revolute">
       <parent link="${name}_thigh"/>
       <child  link="${name}_shin"/>
-      <!-- ставим шарнир в конце бедра -->
       <origin xyz="0 0 -${thigh_length}" rpy="0 0 0"/>
       <axis xyz="1 0 0"/>
       <limit lower="-1.57" upper="1.57" effort="10" velocity="1"/>
@@ -128,99 +127,81 @@
   <xacro:leg name="rear_left"   x="-${body_length/2.0}" y="${body_width/2.0}"/>
   <xacro:leg name="rear_right"  x="-${body_length/2.0}" y="-${body_width/2.0}"/>
 
-  <!-- ===== ros2_control (интерфейсы суставов) ===== -->
-  <!-- Примечание: имя плагина может отличаться в зависимости от установленного пакета (gazebo_ros2_control / gz_ros2_control).
-       Если при запуске ros2_control_node увидите pluginlib-ошибку, см. рекомендации ниже. -->
+  <!-- ===== ros2_control ===== -->
   <ros2_control name="DogSystem" type="system">
     <hardware>
-      <!-- частый рабочий вариант для Gazebo Classic; альтернатива: gazebo_ros2_control/DefaultRobotHWSim -->
       <plugin>gazebo_ros2_control/GazeboSystem</plugin>
     </hardware>
 
-    <!-- перечисляем все суставы и интерфейсы -->
+    <!-- перечисляем все суставы -->
     <joint name="front_left_hip_joint">
       <command_interface name="position"/>
-      <state_interface   name="position"/>
-      <state_interface   name="velocity"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
     </joint>
     <joint name="front_left_thigh_joint">
       <command_interface name="position"/>
-      <state_interface   name="position"/>
-      <state_interface   name="velocity"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
     </joint>
     <joint name="front_left_shin_joint">
       <command_interface name="position"/>
-      <state_interface   name="position"/>
-      <state_interface   name="velocity"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
     </joint>
 
     <joint name="front_right_hip_joint">
       <command_interface name="position"/>
-      <state_interface   name="position"/>
-      <state_interface   name="velocity"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
     </joint>
     <joint name="front_right_thigh_joint">
       <command_interface name="position"/>
-      <state_interface   name="position"/>
-      <state_interface   name="velocity"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
     </joint>
     <joint name="front_right_shin_joint">
       <command_interface name="position"/>
-      <state_interface   name="position"/>
-      <state_interface   name="velocity"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
     </joint>
 
     <joint name="rear_left_hip_joint">
       <command_interface name="position"/>
-      <state_interface   name="position"/>
-      <state_interface   name="velocity"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
     </joint>
     <joint name="rear_left_thigh_joint">
       <command_interface name="position"/>
-      <state_interface   name="position"/>
-      <state_interface   name="velocity"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
     </joint>
     <joint name="rear_left_shin_joint">
       <command_interface name="position"/>
-      <state_interface   name="position"/>
-      <state_interface   name="velocity"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
     </joint>
 
     <joint name="rear_right_hip_joint">
       <command_interface name="position"/>
-      <state_interface   name="position"/>
-      <state_interface   name="velocity"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
     </joint>
     <joint name="rear_right_thigh_joint">
       <command_interface name="position"/>
-      <state_interface   name="position"/>
-      <state_interface   name="velocity"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
     </joint>
     <joint name="rear_right_shin_joint">
       <command_interface name="position"/>
-      <state_interface   name="position"/>
-      <state_interface   name="velocity"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
     </joint>
   </ros2_control>
 
-  <!-- ===== Gazebo плагин (привязан к base_link) ===== -->
+  <!-- ===== Gazebo плагин ===== -->
   <gazebo reference="base_link">
-    <plugin name="gazebo_ros2_control" filename="libgazebo_ros2_control.so">
-      <!-- namespace и параметр робота; gazebo плагин использует robotParam/robotNamespace -->
-      <robotNamespace>/dog</robotNamespace>
-      <robotParam>/robot_description</robotParam>
-      <!-- robotSimType: согласовать с тем, что прописано в <ros2_control>/<hardware>/<plugin>.
-           Если используете Ignition (gz), см. gz_ros2_control вместо gazebo_ros2_control. -->
-      <robotSimType>gazebo_ros2_control/GazeboSystem</robotSimType>
-    </plugin>
-  </gazebo>
-  <gazebo>
-    <sensor type="imu" name="imu_sensor">
-      <always_on>true</always_on>
-      <update_rate>100.0</update_rate>
-      <visualize>true</visualize>
-      <topic>imu/data</topic>
-    </sensor>
+    <plugin name="gazebo_ros2_control" filename="libgazebo_ros2_control.so"/>
   </gazebo>
 
 </robot>
