@@ -1,6 +1,0 @@
-dog_leg_controller:
-  type: dog_controllers/DogLegController
-  joints:
-    - front_left_hip_joint
-    - front_left_knee_joint
-    - front_left_shoulder_joint

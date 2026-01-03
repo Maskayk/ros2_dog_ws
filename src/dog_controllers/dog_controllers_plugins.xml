@@ -1,6 +1,0 @@
-<library path="libdog_controllers.so">
-  <class
-    name="dog_controllers/DogLegController"
-    type="dog_controllers::DogLegController"
-    base_class_type="controller_interface::ControllerInterface"/>
-</library>

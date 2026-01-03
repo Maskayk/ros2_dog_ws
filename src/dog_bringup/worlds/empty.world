@@ -1,11 +1,17 @@
 <?xml version="1.0" ?>
 <sdf version="1.6">
-  <world name="empty_world">
-    <include>
-      <uri>model://ground_plane</uri>
-    </include>
+  <world name="default">
+    <!-- Подключаем ROS factory -->
+    <plugin name="gazebo_ros_factory" filename="libgazebo_ros_factory.so"/>
+
+    <!-- Освещение -->
     <include>
       <uri>model://sun</uri>
+    </include>
+
+    <!-- Плоскость -->
+    <include>
+      <uri>model://ground_plane</uri>
     </include>
   </world>
 </sdf>

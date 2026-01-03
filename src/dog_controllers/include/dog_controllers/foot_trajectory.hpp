@@ -31,4 +31,4 @@
     double step_height_;
     double duty_;
 
-  }
+  };
