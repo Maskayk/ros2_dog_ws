@@ -22,6 +22,7 @@ setup(
         'console_scripts': [
 
             'stand_up = my_dog_node.stand_up:main',
+            'trot = my_dog_node.trot:main',
         ],
     },
 )

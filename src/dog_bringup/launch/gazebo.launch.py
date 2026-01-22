@@ -61,7 +61,7 @@ def generate_launch_description():
         arguments=[
             "-topic", "robot_description",
             "-entity", "dog",
-            "-z", "0.35",
+            "-z", "0.25",
             # Мы используем initial_value в URDF, поэтому -J тут не нужны
         ],
         output="screen",

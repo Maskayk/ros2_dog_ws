@@ -19,11 +19,11 @@ class DogController(Node):
         self.timer = self.create_timer(0.02, self.timer_callback)
         
         # Параметры робота (из твоего URDF)
-        self.L1 = 0.05   # Hip length (отступ вбок)
-        self.L2 = 0.25   # Thigh length (бедро)
-        self.L3 = 0.25   # Shin length (голень)
+        self.L1 = 0.06   # Hip length (отступ вбок)
+        self.L2 = 0.144   # Thigh length (бедро)
+        self.L3 = 0.1525   # Shin length (голень)
         
-        self.get_logger().info("Dog Controller Started. Standing up...")
+        self.get_logger().info("Dog Controller Started with REAL dimensions.")
 
     def inverse_kinematics(self, x, y, z, side_sign):
         """
@@ -98,7 +98,7 @@ class DogController(Node):
         # Целевая высота (постепенно встаем)
         # z = -0.35 (лапа должна быть на 35 см ниже плеча)
         # x = 0.0 (лапа ровно под плечом)
-        target_z = -0.35
+        target_z = -0.25
         target_x = 0.0
         target_y = 0.0 # Лапы не разъезжаются
         
