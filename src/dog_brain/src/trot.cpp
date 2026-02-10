@@ -18,7 +18,6 @@ public:
         timer_ = this->create_wall_timer(
             20ms, std::bind(&TrotNode::timer_callback, this));
         start_time_ = this->now();
-        RCLCPP_INFO(this->get_logger(), "C++ Trot Node: Small Steps + Balance Offset");
     }
 
 private:
@@ -26,42 +25,39 @@ private:
     const double L2 = 0.144;
     const double L3 = 0.1525;
 
-    // === НАСТРОЙКИ ДЛЯ БОРЬБЫ СО СКОЛЬЖЕНИЕМ ===
-    const double WALKING_HEIGHT = -0.17; // Чуть ниже
-    const double STEP_LENGTH = 0.035;    // ОЧЕНЬ КОРОТКИЙ ШАГ (3.5 см). Длинные шаги вызывают скольжение.
-    const double STEP_HEIGHT = 0.03;
-    const double PERIOD = 2.0;           // Медленно (2 секунды на цикл)
+    // === ПАРАМЕТРЫ (Медленные и стабильные) ===
+    const double WALKING_HEIGHT = -0.18;
+    const double STEP_LENGTH = 0.05;
+    const double STEP_HEIGHT = 0.04;
+    const double PERIOD = 1.0;
+    const double X_OFFSET = 0.02; // Чуть сдвигаем ноги вперед
 
-    // !!! ВАЖНО !!! СМЕЩЕНИЕ ЦЕНТРА
-    // Если робот "клюет носом" или ноги слишком сзади, меняй это число.
-    // Попробуй 0.0, 0.02 или -0.02.
-    // Судя по скриншоту, ноги уходят назад, значит надо сдвинуть стопу ВПЕРЕД (+0.02)
-    const double X_OFFSET = 0.02; 
-
-    struct Point { double x; double z; };
+    struct Point { double x; double y; double z; };
 
     std::vector<double> inverse_kinematics(double x, double y, double z)
     {
-        // Применяем смещение для балансировки
         double target_x = x + X_OFFSET;
-
         double theta1 = 0.0;
-        double dist_2d = std::sqrt(target_x * target_x + z * z);
-        double max_reach = L2 + L3 - 0.001;
+        
+        // Работаем с абсолютными значениями
+        double abs_z = std::abs(z);
+        double dist_2d = std::sqrt(target_x * target_x + abs_z * abs_z);
+        
+        double max_reach = L2 + L3 - 0.005;
         if (dist_2d > max_reach) dist_2d = max_reach;
 
         double cos_knee = (L2 * L2 + L3 * L3 - dist_2d * dist_2d) / (2 * L2 * L3);
         if (cos_knee > 1.0) cos_knee = 1.0;
         if (cos_knee < -1.0) cos_knee = -1.0;
         double phi = std::acos(cos_knee);
-        double theta3 = -(M_PI - phi);
+        double theta3 = -(M_PI - phi); // Колено гнется назад
 
-        double alpha = std::atan2(target_x, -z); // Используем target_x
+        double alpha = std::atan2(target_x, abs_z); // Внимание: abs_z
         double cos_beta = (L2 * L2 + dist_2d * dist_2d - L3 * L3) / (2 * L2 * dist_2d);
         if (cos_beta > 1.0) cos_beta = 1.0;
         if (cos_beta < -1.0) cos_beta = -1.0;
         double beta = std::acos(cos_beta);
-        double theta2 = alpha + beta;
+        double theta2 = alpha + beta; // Бедро гнется вперед
 
         return {theta1, theta2, theta3};
     }
@@ -72,36 +68,43 @@ private:
         double x = 0.0;
         double z = WALKING_HEIGHT;
 
-        if (cycle_t < 0.5)
+       if (cycle_t < 0.5)
         {
-            // === SWING (Воздух) ===
+            // === SWING (Перенос) ===
             double swing_progress = cycle_t / 0.5;
+            
+            // X: БЫЛО -cos, СТАЛО +cos (Инверсия)
             x = (STEP_LENGTH / 2.0) * std::cos(M_PI * swing_progress);
             
-            // Поднимаем лапу для шага
             z = WALKING_HEIGHT + STEP_HEIGHT * std::sin(M_PI * swing_progress);
         }
         else
         {
-            // === STANCE (Земля) ===
+            // === STANCE (Опора) ===
             double stance_progress = (cycle_t - 0.5) / 0.5;
+            
+            // X: БЫЛО (1 - 2p), СТАЛО (2p - 1) (Инверсия)
+            // Теперь лапа едет Спереди -> Назад, толкая робота ВПЕРЕД.
             x = (STEP_LENGTH / 2.0) * (2.0 * stance_progress - 1.0);
             
-            // ХАК ДЛЯ СЦЕПЛЕНИЯ:
-            // Мы говорим роботу: "Опусти лапу на 1.5 см ниже уровня пола".
-            // Пол не пустит, поэтому робот будет сильно давить вниз.
-            // Это увеличит силу трения в разы.
-            z = WALKING_HEIGHT - 0.015; 
+            z = WALKING_HEIGHT; 
         }
-
-        return {x, z};
+        return {x, 0.0, z};
     }
 
     void timer_callback()
     {
         double t = (this->now() - start_time_).seconds();
+        
+        // Диагональ 1 (FL, RR)
         Point p1 = get_leg_trajectory(t, 0.0);
+        // Диагональ 2 (FR, RL)
         Point p2 = get_leg_trajectory(t, 0.5);
+
+        // ВАЖНО: Если лапы "двигаются как угодно", 
+        // возможно, для задних лап нужен инвертированный X, 
+        // так как их суставы могут быть развернуты на 180 градусов в URDF.
+        // Пока считаем, что все суставы смотрят в одну сторону.
 
         auto fl = inverse_kinematics(p1.x, 0.0, p1.z);
         auto fr = inverse_kinematics(p2.x, 0.0, p2.z);

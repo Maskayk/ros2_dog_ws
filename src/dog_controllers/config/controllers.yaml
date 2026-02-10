@@ -1,10 +1,8 @@
 controller_manager:
   ros__parameters:
-    update_rate: 100  # Hz
-
+    update_rate: 100
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
-
     joint_group_position_controller:
       type: position_controllers/JointGroupPositionController
 
@@ -23,28 +21,22 @@ joint_group_position_controller:
       - rear_right_hip_joint
       - rear_right_thigh_joint
       - rear_right_shin_joint
-
-    command_interfaces:
-      - position
-    state_interfaces:
-      - position
-      - velocity
+    command_interfaces: [position]
+    state_interfaces: [position, velocity]
 
 gazebo_ros2_control:
   ros__parameters:
     pid_gains:
-      front_left_hip_joint: {p: 40.0, i: 0.0, d: 2.5}
-      front_left_thigh_joint: {p: 40.0, i: 0.0, d: 2.5}
-      front_left_shin_joint: {p: 40.0, i: 0.0, d: 2.5}
-      
-      front_right_hip_joint: {p: 40.0, i: 0.0, d: 2.5}
-      front_right_thigh_joint: {p: 40.0, i: 0.0, d: 2.5}
-      front_right_shin_joint: {p: 40.0, i: 0.0, d: 2.5}
-      
-      rear_left_hip_joint: {p: 40.0, i: 0.0, d: 2.5}
-      rear_left_thigh_joint: {p: 40.0, i: 0.0, d: 2.5}
-      rear_left_shin_joint: {p: 40.0, i: 0.0, d: 2.5}
-      
-      rear_right_hip_joint: {p: 40.0, i: 0.0, d: 2.5}
-      rear_right_thigh_joint: {p: 40.0, i: 0.0, d: 2.5}
-      rear_right_shin_joint: {p: 40.0, i: 0.0, d: 2.5}
+      # P=80 (Сила), D=2.0 (Плавность)
+      front_left_hip_joint: {p: 80.0, i: 0.0, d: 2.0}
+      front_left_thigh_joint: {p: 80.0, i: 0.0, d: 2.0}
+      front_left_shin_joint: {p: 80.0, i: 0.0, d: 2.0}
+      front_right_hip_joint: {p: 80.0, i: 0.0, d: 2.0}
+      front_right_thigh_joint: {p: 80.0, i: 0.0, d: 2.0}
+      front_right_shin_joint: {p: 80.0, i: 0.0, d: 2.0}
+      rear_left_hip_joint: {p: 80.0, i: 0.0, d: 2.0}
+      rear_left_thigh_joint: {p: 80.0, i: 0.0, d: 2.0}
+      rear_left_shin_joint: {p: 80.0, i: 0.0, d: 2.0}
+      rear_right_hip_joint: {p: 80.0, i: 0.0, d: 2.0}
+      rear_right_thigh_joint: {p: 80.0, i: 0.0, d: 2.0}
+      rear_right_shin_joint: {p: 80.0, i: 0.0, d: 2.0}
