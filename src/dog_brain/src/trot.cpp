@@ -91,11 +91,12 @@ private:
         // Масштабируем длину шага от скорости
         double current_step_length = STEP_LENGTH * target_linear_x_; 
 
-        if (std::abs(current_step_length) < 0.001) {
-             // Стоим на месте
-             return {0.0, 0.0, WALKING_HEIGHT};
-        }
-
+       if (std::abs(current_step_length) < 0.001) {
+         // СТОИМ НА МЕСТЕ
+         // Вместо просто высоты, давай опустим его на 1 см ниже.
+         // Это создаст сильное давление на стопы и остановит дрейф.
+         return {0.0, 0.0, WALKING_HEIGHT - 0.01}; 
+    }
         if (cycle_t < 0.5)
         {
             // === SWING (Перенос) ===
@@ -106,6 +107,7 @@ private:
             
             z = WALKING_HEIGHT + STEP_HEIGHT * std::sin(M_PI * swing_progress);
         }
+        
         else
         {
             // === STANCE (Опора) ===

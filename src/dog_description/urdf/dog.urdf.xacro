@@ -58,7 +58,6 @@
             <origin xyz="${side_x * trunk_l/2} ${side_y * trunk_w/2} 0" rpy="0 0 0"/>
             <axis xyz="1 0 0"/> 
             <limit lower="-0.8" upper="0.8" effort="20" velocity="20"/>
-            <dynamics damping="0.5" friction="0.5"/> 
         </joint>
         <gazebo reference="${prefix}_hip_joint">
             <implicitSpringDamper>true</implicitSpringDamper>
@@ -75,7 +74,6 @@
             <origin xyz="0 ${side_y * hip_l} 0" rpy="0 0 0"/>
             <axis xyz="0 1 0"/> 
             <limit lower="-1.0" upper="4.0" effort="20" velocity="20"/>
-            <dynamics damping="0.5" friction="0.5"/>
         </joint>
         <gazebo reference="${prefix}_thigh_joint">
             <implicitSpringDamper>true</implicitSpringDamper>
@@ -97,7 +95,6 @@
             <origin xyz="0 0 ${-thigh_l}" rpy="0 0 0"/>
             <axis xyz="0 1 0"/> 
             <limit lower="-4.0" upper="-0.5" effort="20" velocity="20"/>
-            <dynamics damping="0.5" friction="0.5"/>
         </joint>
         <gazebo reference="${prefix}_shin_joint">
             <implicitSpringDamper>true</implicitSpringDamper>
@@ -112,10 +109,18 @@
                 <geometry><sphere radius="0.03"/></geometry>
                 <surface>
                     <friction>
-                        <ode><mu>200.0</mu><mu2>200.0</mu2></ode>
+                        <ode>
+                            <mu>1.0</mu> 
+                            <mu2>1.0</mu2>
+                        </ode>
                     </friction>
                     <contact>
-                        <ode><kp>1000000.0</kp><kd>100.0</kd><minDepth>0.001</minDepth></ode>
+                        <ode>
+                            <kp>500000.0</kp>
+                            <kd>100.0</kd>
+                            <minDepth>0.003</minDepth> 
+                            <maxVel>0.0</maxVel>
+                        </ode>
                     </contact>
                 </surface>
             </collision>
