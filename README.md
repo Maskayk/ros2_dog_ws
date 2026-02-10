@@ -75,4 +75,6 @@ dog_ws/
         ├── package.xml
         └── CMakeLists.txt
 
+ДРУГАЯ АРХИТЕКТУРА 
+
 ```
