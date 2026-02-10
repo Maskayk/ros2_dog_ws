@@ -26,10 +26,10 @@ private:
     const double L3 = 0.1525;
 
     // === ПАРАМЕТРЫ (Медленные и стабильные) ===
-    const double WALKING_HEIGHT = -0.18;
+    const double WALKING_HEIGHT = -0.25;
     const double STEP_LENGTH = 0.05;
     const double STEP_HEIGHT = 0.04;
-    const double PERIOD = 1.0;
+    const double PERIOD = 1.5;
     const double X_OFFSET = 0.02; // Чуть сдвигаем ноги вперед
 
     struct Point { double x; double y; double z; };
