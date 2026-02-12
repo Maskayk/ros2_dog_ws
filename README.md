@@ -1,80 +1,84 @@
 ```
-dog_ws/
-├── build/
-├── install/
-├── log/
-└── src/
-    ├── dog_description/                     # Геометрия, URDF, визуализация
-    │   ├── urdf/
-    │   │   ├── dog.urdf.xacro
-    │   │   └── materials.xacro
-    │   ├── meshes/
-    │   │   ├── body.stl
-    │   │   ├── leg_upper.stl
-    │   │   └── leg_lower.stl
-    │   ├── launch/
-    │   │   └── display.launch.py
-    │   └── config/
-    │       └── joint_limits.yaml
-    │
-    ├── dog_bringup/                         # Главный пакет запуска симуляции
-    │   ├── launch/
-    │   │   ├── gazebo.launch.py             # Запуск Gazebo с моделью
-    │   │   ├── rviz.launch.py               # RViz (опционально)
-    │   │   └── full_system.launch.py        # Всё сразу (URDF + Gazebo + контроллеры)
-    │   ├── config/
-    │   │   └── controllers.yaml             # Подключение контроллеров ros2_control
-    │   ├── worlds/
-    │   │   └── empty.world
-    │   ├── package.xml
-    │   └── CMakeLists.txt
-    │
-    ├── dog_controllers/                     # Пользовательские контроллеры
-    │   ├── include/dog_controllers/
-    │   │   ├── dog_leg_controller.hpp
-    │   │   ├── leg_kinematics.hpp
-    │   │   ├── foot_trajectory.hpp
-    │   │   └── gait_generator.hpp           # Ритмы ходьбы (трот, галоп и т.п.)
-    │   ├── src/
-    │   │   ├── dog_leg_controller.cpp
-    │   │   ├── leg_kinematics.cpp
-    │   │   ├── foot_trajectory.cpp
-    │   │   ├── gait_generator.cpp
-    │   │   └── plugin_registration.cpp      # Регистрация контроллера
-    │   ├── config/
-    │   │   └── dog_leg_controller.yaml
-    │   ├── launch/
-    │   │   └── dog_controllers.launch.py
-    │   ├── dog_controllers_plugins.xml
-    │   ├── package.xml
-    │   └── CMakeLists.txt
-    │
-    ├── dog_hardware/                        # Эмуляция аппаратной части (gazebo + реальный драйвер)
-    │   ├── include/dog_hardware/
-    │   │   └── dog_hardware_interface.hpp
-    │   ├── src/
-    │   │   ├── dog_hardware_interface.cpp
-    │   │   └── plugin_registration.cpp
-    │   ├── dog_hardware_plugins.xml
-    │   ├── package.xml
-    │   └── CMakeLists.txt
-    │
-    ├── my_dog_node/                         # Пользовательский узел управления
-    │   ├── src/
-    │   │   └── my_dog_node.cpp
-    │   ├── include/my_dog_node/
-    │   │   └── my_dog_node.hpp
-    │   ├── package.xml
-    │   └── CMakeLists.txt
-    │
-    └── dog_teleop/                          # Управление с клавиатуры или джойстика
-        ├── src/
-        │   └── teleop_keyboard.cpp
-        ├── launch/
-        │   └── teleop.launch.py
-        ├── package.xml
-        └── CMakeLists.txt
+# 🐕 ROS 2 Quadruped Robot ("Dog") Simulation Workspace
 
-ДРУГАЯ АРХИТЕКТУРА 
+A modular, production-ready ROS 2 simulation framework for a 12-DOF quadruped robot with trot gait controller, inverse kinematics, and IMU-based body stabilization.
+
+**Key Features:**
+- ✅ Pure C++ kinematics & gait library (ZERO ROS dependencies)
+- ✅ Thin ROS 2 wrapper for real-time control
+- ✅ 12 joints (4 legs × 3 DoF: hip_roll, thigh_pitch, shin_pitch)
+- ✅ Gazebo Classic simulation with ODE physics
+- ✅ ros2_control integration for hardware abstraction
+- ✅ IMU stabilization with quaternion-based roll/pitch correction
+- ✅ Runtime parameter tuning (gait timing, step height, stabilization gains)
+- ✅ Multiple gait patterns (Trot, Walk, Pace, Bound ready)
+
+---
+
+## 📐 Architecture Overview
+
+### Library Design Philosophy
+
+**`dog_brain_lib`** — Pure C++ library with **ZERO ROS dependencies**
+- All kinematics, gait planning, and trajectory computation
+- Fully unit testable without ROS infrastructure
+- Portable to real robot hardware
+- Headers only in `include/dog_brain/` (types, interfaces)
+- Implementation in `src/` (algorithms, math)
+
+**`trot_node`** — Thin ROS 2 wrapper
+- Subscribes to `/cmd_vel`, `/imu/data`, `/joint_states`
+- Publishes to `/joint_group_position_controller/commands`
+- **Delegates all math to `dog_brain_lib`** — no business logic in this node
+- 50 Hz control loop
+- Parameter server integration for runtime tuning
+
+### Package Structure
+ros2_dog_ws/
+├── src/
+│   ├── dog_description/
+│   │   ├── urdf/
+│   │   │   ├── dog.urdf.xacro         # Main robot URDF (xacro format)
+│   │   │   └── dog_leg.xacro          # Leg macro (reused 4x with parameters)
+│   │   ├── config/
+│   │   │   └── rviz.rviz             # RViz visualization config
+│   │   ├── launch/
+│   │   │   └── view_dog.launch.py    # URDF viewer launch
+│   │   └── package.xml
+│   │
+│   ├── dog_bringup/
+│   │   ├── launch/
+│   │   │   └── gazebo.launch.py      # Full simulation launcher
+│   │   ├── worlds/
+│   │   │   └── dog_world.world       # Gazebo world file
+│   │   ├── config/
+│   │   │   ├── controllers.yaml      # controller_manager config
+│   │   │   └── ros2_control.yaml     # hardware interface config
+│   │   └── package.xml
+│   │
+│   └── dog_brain/
+│       ├── include/dog_brain/
+│       │   ├── types.hpp             # Data structures & geometry constants
+│       │   ├── leg_kinematics.hpp    # IK/FK algorithms
+│       │   ├── gait_generator.hpp    # Gait phase offsets
+│       │   ├── foot_trajectory.hpp   # Swing/stance trajectories
+│       │   └── body_controller.hpp   # IMU stabilization
+│       ├── src/
+│       │   ├── leg_kinematics.cpp
+│       │   ├── gait_generator.cpp
+│       │   ├── foot_trajectory.cpp
+│       │   ├── body_controller.cpp
+│       │   ├── trot_node.cpp         # ROS 2 node (main entry point)
+│       │   └── CMakeLists.txt
+│       ├── test/
+│       │   └── test_kinematics.cpp   # Unit tests
+│       ├── config/
+│       │   └── gait_params.yaml      # Tunable parameters
+│       └── package.xml
+│
+├── install/                          # Build artifacts (generated)
+├── build/                            # CMake build (generated)
+├── CLAUDE.md                         # AI coding guidelines
+└── README.md                         # This file 
 
 ```
