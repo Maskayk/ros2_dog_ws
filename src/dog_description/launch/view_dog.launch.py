@@ -26,7 +26,7 @@ def generate_launch_description():
     rviz = Node(
         package='rviz2',
         executable='rviz2',
-        arguments=['-d', os.path.join(pkg_path, 'rviz', 'view_dog.rviz')],
+        arguments=['-d', os.path.join(pkg_path, 'config', 'view_dog.rviz')],
         output='screen'
     )
 

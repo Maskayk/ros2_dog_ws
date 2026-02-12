@@ -1,0 +1,30 @@
+trot_node:
+  ros__parameters:
+    # Параметры походки
+    gait:
+      period: 0.6           # Период полного цикла (секунды). Короче = быстрее шаг
+      duty_factor: 0.65     # Доля stance фазы (0.65 = 65% stance, 35% swing — более устойчиво)
+
+    # Параметры траектории стопы
+    trajectory:
+      # ВАЖНО: z_nominal ДОЛЖЕН совпадать с URDF начальной позой!
+      # IK(thigh=0.76, shin=-1.47) = z=-0.22
+      z_nominal: -0.22      # Номинальная высота стойки (м, отрицательная = вниз от бедра)
+      step_height: 0.03     # Максимальный подъём стопы при swing (м)
+      step_amp_x: 0.03      # Масштаб амплитуды шага
+      yaw_lever: 0.08       # Плечо для yaw -> x преобразования (м)
+
+    # Стабилизация корпуса (IMU)
+    stabilization:
+      enabled: false         # true для включения IMU-стабилизации
+      kp_roll: 0.3
+      kp_pitch: 0.3
+      kd_roll: 0.0
+      kd_pitch: 0.0
+      max_correction_z: 0.02
+      max_correction_x: 0.02
+
+    # Фильтр скорости
+    filter:
+      alpha: 0.15           # Коэффициент low-pass фильтра (чуть быстрее отклик)
+      stationary_threshold: 0.01

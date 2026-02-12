@@ -4,7 +4,7 @@ project(dog_description)
 find_package(ament_cmake REQUIRED)
 
 install(
-  DIRECTORY urdf launch
+  DIRECTORY urdf launch config meshes
   DESTINATION share/${PROJECT_NAME}
 )
 

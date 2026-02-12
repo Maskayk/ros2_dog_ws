@@ -18,8 +18,7 @@
   <depend>position_controllers</depend>
   <depend>ros2_control</depend>
   <depend>dog_description</depend>
-  <depend>dog_controllers</depend>
-  <depend>dog_hardware</depend>
+  <exec_depend>dog_brain</exec_depend>
 
   <export>
     <build_type>ament_cmake</build_type>
