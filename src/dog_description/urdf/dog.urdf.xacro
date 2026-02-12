@@ -5,29 +5,24 @@
     <xacro:property name="trunk_l" value="0.475"/>
     <xacro:property name="trunk_w" value="0.18"/>
     <xacro:property name="trunk_h" value="0.1"/>
-    <xacro:property name="trunk_m" value="6.0"/>
+    <xacro:property name="trunk_m" value="5.0"/>
 
     <xacro:property name="hip_l" value="0.06"/>
-    <xacro:property name="hip_m" value="0.2"/>
+    <xacro:property name="hip_m" value="0.15"/>
     <xacro:property name="hip_r" value="0.02"/>
 
     <xacro:property name="thigh_l" value="0.144"/>
     <xacro:property name="shin_l" value="0.1525"/>
-    <xacro:property name="leg_m" value="0.6"/>
+    <xacro:property name="thigh_m" value="0.3"/>
+    <xacro:property name="shin_m" value="0.15"/>
     <xacro:property name="leg_r" value="0.02"/>
-    <xacro:property name="foot_r" value="0.025"/>
-
-    <!-- Начальная поза стойки: IK(x=0, z=-0.22) -->
-    <!-- thigh=0.76 rad, shin=-1.47 rad => нога опущена на 0.22м ниже бедра -->
-    <xacro:property name="init_thigh" value="0.76"/>
-    <xacro:property name="init_shin" value="-1.47"/>
+    <xacro:property name="foot_r" value="0.02"/>
 
     <!-- ==================== MATERIALS ==================== -->
     <material name="black"><color rgba="0.1 0.1 0.1 1"/></material>
     <material name="grey"><color rgba="0.6 0.6 0.6 1"/></material>
 
     <!-- ==================== INERTIA MACROS ==================== -->
-    <!-- Box inertia (CoM в центре box) -->
     <xacro:macro name="box_inertia" params="m l w h">
         <inertial>
             <mass value="${m}"/>
@@ -37,7 +32,6 @@
         </inertial>
     </xacro:macro>
 
-    <!-- Cylinder inertia со смещённым центром масс -->
     <xacro:macro name="cylinder_inertia_offset" params="m r h ox oy oz">
         <inertial>
             <origin xyz="${ox} ${oy} ${oz}"/>
@@ -72,9 +66,9 @@
         <gazebo reference="${prefix}_shin">
             <mu1>1.5</mu1>
             <mu2>1.5</mu2>
-            <kp>100000.0</kp>
-            <kd>100.0</kd>
-            <minDepth>0.001</minDepth>
+            <kp>50000.0</kp>
+            <kd>50.0</kd>
+            <minDepth>0.002</minDepth>
         </gazebo>
     </xacro:macro>
 
@@ -86,8 +80,8 @@
             <parent link="trunk"/> <child link="${prefix}_hip"/>
             <origin xyz="${side_x * trunk_l/2} ${side_y * trunk_w/2} 0" rpy="0 0 0"/>
             <axis xyz="1 0 0"/>
-            <limit lower="-0.5" upper="0.5" effort="20" velocity="10"/>
-            <dynamics damping="1.0" friction="0.3"/>
+            <limit lower="-0.5" upper="0.5" effort="40" velocity="10"/>
+            <dynamics damping="0.5" friction="0.1"/>
         </joint>
         <link name="${prefix}_hip">
             <visual>
@@ -104,8 +98,8 @@
             <parent link="${prefix}_hip"/> <child link="${prefix}_thigh"/>
             <origin xyz="0 ${side_y * hip_l} 0" rpy="0 0 0"/>
             <axis xyz="0 1 0"/>
-            <limit lower="-0.5" upper="2.5" effort="20" velocity="10"/>
-            <dynamics damping="1.0" friction="0.3"/>
+            <limit lower="-0.5" upper="2.5" effort="40" velocity="10"/>
+            <dynamics damping="0.5" friction="0.1"/>
         </joint>
         <link name="${prefix}_thigh">
             <visual>
@@ -115,9 +109,9 @@
             </visual>
             <collision>
                 <origin xyz="0 0 ${-thigh_l/2}"/>
-                <geometry><cylinder radius="${leg_r}" length="${thigh_l - 0.04}"/></geometry>
+                <geometry><cylinder radius="${leg_r}" length="${thigh_l}"/></geometry>
             </collision>
-            <xacro:cylinder_inertia_offset m="${leg_m}" r="${leg_r}" h="${thigh_l}"
+            <xacro:cylinder_inertia_offset m="${thigh_m}" r="${leg_r}" h="${thigh_l}"
                 ox="0" oy="0" oz="${-thigh_l/2}"/>
         </link>
 
@@ -126,8 +120,8 @@
             <parent link="${prefix}_thigh"/> <child link="${prefix}_shin"/>
             <origin xyz="0 0 ${-thigh_l}" rpy="0 0 0"/>
             <axis xyz="0 1 0"/>
-            <limit lower="-2.7" upper="-0.3" effort="20" velocity="10"/>
-            <dynamics damping="1.0" friction="0.3"/>
+            <limit lower="-2.7" upper="-0.3" effort="40" velocity="10"/>
+            <dynamics damping="0.5" friction="0.1"/>
         </joint>
         <link name="${prefix}_shin">
             <visual>
@@ -144,7 +138,7 @@
                 <origin xyz="0 0 ${-shin_l}"/>
                 <geometry><sphere radius="${foot_r}"/></geometry>
             </collision>
-            <xacro:cylinder_inertia_offset m="${leg_m}" r="${leg_r*0.8}" h="${shin_l}"
+            <xacro:cylinder_inertia_offset m="${shin_m}" r="${leg_r*0.8}" h="${shin_l}"
                 ox="0" oy="0" oz="${-shin_l/2}"/>
         </link>
 
@@ -159,35 +153,37 @@
     <xacro:dog_leg prefix="rear_right"  side_x="-1" side_y="-1"/>
 
     <!-- ==================== ROS2 CONTROL ==================== -->
+    <!-- initial_value MUST match the physical spawn pose (thigh=0, shin=-0.3) -->
     <ros2_control name="GazeboSystem" type="system">
         <hardware><plugin>gazebo_ros2_control/GazeboSystem</plugin></hardware>
-        <xacro:macro name="init_pos" params="name t s">
+        <xacro:macro name="init_pos" params="name">
             <joint name="${name}_hip_joint">
                 <state_interface name="position"><param name="initial_value">0.0</param></state_interface>
                 <command_interface name="position"/>
                 <state_interface name="velocity"/>
             </joint>
             <joint name="${name}_thigh_joint">
-                <state_interface name="position"><param name="initial_value">${t}</param></state_interface>
+                <state_interface name="position"><param name="initial_value">0.0</param></state_interface>
                 <command_interface name="position"/>
                 <state_interface name="velocity"/>
             </joint>
             <joint name="${name}_shin_joint">
-                <state_interface name="position"><param name="initial_value">${s}</param></state_interface>
+                <state_interface name="position"><param name="initial_value">-0.3</param></state_interface>
                 <command_interface name="position"/>
                 <state_interface name="velocity"/>
             </joint>
         </xacro:macro>
-        <xacro:init_pos name="front_left"  t="${init_thigh}" s="${init_shin}"/>
-        <xacro:init_pos name="front_right" t="${init_thigh}" s="${init_shin}"/>
-        <xacro:init_pos name="rear_left"   t="${init_thigh}" s="${init_shin}"/>
-        <xacro:init_pos name="rear_right"  t="${init_thigh}" s="${init_shin}"/>
+        <xacro:init_pos name="front_left"/>
+        <xacro:init_pos name="front_right"/>
+        <xacro:init_pos name="rear_left"/>
+        <xacro:init_pos name="rear_right"/>
     </ros2_control>
 
     <!-- ==================== GAZEBO PLUGINS ==================== -->
     <gazebo>
         <plugin name="gazebo_ros2_control" filename="libgazebo_ros2_control.so">
             <parameters>$(find dog_bringup)/config/controllers.yaml</parameters>
+            <hold_joints>true</hold_joints>
         </plugin>
     </gazebo>
 

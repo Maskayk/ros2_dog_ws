@@ -1,5 +1,6 @@
 #include <chrono>
 #include <memory>
+#include <cmath>
 
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/float64_multi_array.hpp"
@@ -44,7 +45,9 @@ public:
         this->declare_parameter("filter.alpha", 0.15);
         this->declare_parameter("filter.stationary_threshold", 0.01);
 
-        // Загружаем параметры в компоненты
+        // --- Параметры startup ramp ---
+        this->declare_parameter("startup.ramp_duration", 2.0);
+
         loadParameters();
 
         // --- ROS интерфейсы ---
@@ -64,9 +67,16 @@ public:
 
         start_time_ = this->now();
 
+        // Вычисляем стопу в spawn-позе (thigh=0, shin=-0.3)
+        LegJoints spawn_joints;
+        spawn_joints.thigh = 0.0;
+        spawn_joints.knee = -0.3;
+        spawn_foot_ = kinematics_.solveFK(spawn_joints, 1.0);
+
         RCLCPP_INFO(this->get_logger(),
-            "TrotNode started (modular architecture, IMU stabilization %s)",
-            body_ctrl_.config().enabled ? "ON" : "OFF");
+            "TrotNode started. Spawn foot: x=%.3f z=%.3f, target z=%.3f, ramp=%.1fs",
+            spawn_foot_.x, spawn_foot_.z,
+            trajectory_.config().z_nominal, ramp_duration_);
     }
 
 private:
@@ -100,6 +110,9 @@ private:
         // Filter
         filter_alpha_       = this->get_parameter("filter.alpha").as_double();
         stationary_thresh_  = this->get_parameter("filter.stationary_threshold").as_double();
+
+        // Startup ramp
+        ramp_duration_      = this->get_parameter("startup.ramp_duration").as_double();
     }
 
     void cmdVelCallback(const geometry_msgs::msg::Twist::SharedPtr msg)
@@ -115,21 +128,36 @@ private:
             msg->orientation.x, msg->orientation.y,
             msg->orientation.z, msg->orientation.w);
         body_ctrl_.updateOrientation(orient);
-
-        // Периодическое логирование IMU (~2 сек)
-        if (++imu_log_counter_ >= 100) {
-            RCLCPP_DEBUG(this->get_logger(), "IMU: roll=%.3f pitch=%.3f",
-                orient.roll, orient.pitch);
-            imu_log_counter_ = 0;
-        }
     }
 
     void timerCallback()
     {
-        // Перезагрузка параметров (для runtime tuning)
         loadParameters();
 
-        // Сглаживание скорости (low-pass filter)
+        double elapsed = (this->now() - start_time_).seconds();
+
+        // === ФАЗА 1: Startup ramp (плавный переход от spawn позы к стойке) ===
+        if (elapsed < ramp_duration_) {
+            // Smoothstep интерполяция: 3t^2-2t^3
+            double t = elapsed / ramp_duration_;
+            double alpha = 3.0 * t * t - 2.0 * t * t * t;
+
+            FootPosition target = trajectory_.standingPose(); // (0, 0, z_nominal)
+            FootPosition foot;
+            foot.x = spawn_foot_.x * (1.0 - alpha) + target.x * alpha;
+            foot.z = spawn_foot_.z * (1.0 - alpha) + target.z * alpha;
+            foot.y = 0.0;
+
+            LegJoints q = kinematics_.solveIK(foot, 1.0);
+            QuadJoints joints;
+            for (int i = 0; i < LEG_COUNT; ++i) {
+                joints[i] = q;
+            }
+            publishJoints(joints);
+            return;
+        }
+
+        // === ФАЗА 2: Нормальная работа ===
         smoothed_vel_.vx   += (cmd_vel_.vx   - smoothed_vel_.vx)   * filter_alpha_;
         smoothed_vel_.vy   += (cmd_vel_.vy   - smoothed_vel_.vy)   * filter_alpha_;
         smoothed_vel_.vyaw += (cmd_vel_.vyaw - smoothed_vel_.vyaw) * filter_alpha_;
@@ -150,18 +178,16 @@ private:
             return;
         }
 
-        // Вычисляем фазы походки
-        double elapsed = (this->now() - start_time_).seconds();
-        auto phases = gait_.update(elapsed);
+        // Вычисляем фазы походки (время считаем от конца ramp)
+        double walk_time = elapsed - ramp_duration_;
+        auto phases = gait_.update(walk_time);
 
         // Коррекции от IMU
         auto corrections = body_ctrl_.computeCorrections();
 
-        // Для каждой ноги: траектория + коррекция + IK
         for (int i = 0; i < LEG_COUNT; ++i) {
             FootPosition foot = trajectory_.compute(phases[i], smoothed_vel_, static_cast<LegId>(i));
 
-            // Добавляем коррекцию стабилизации
             foot.x += corrections[i].x;
             foot.z += corrections[i].z;
 
@@ -176,7 +202,6 @@ private:
         std_msgs::msg::Float64MultiArray msg;
         msg.data.resize(TOTAL_JOINTS);
 
-        // Порядок: FL_hip, FL_thigh, FL_shin, FR_..., RL_..., RR_...
         for (int i = 0; i < LEG_COUNT; ++i) {
             msg.data[i * JOINTS_PER_LEG + 0] = joints[i].hip;
             msg.data[i * JOINTS_PER_LEG + 1] = joints[i].thigh;
@@ -203,12 +228,13 @@ private:
     VelocityCommand cmd_vel_;
     VelocityCommand smoothed_vel_;
 
-    // --- Параметры фильтра ---
-    double filter_alpha_      = 0.1;
+    // --- Параметры ---
+    double filter_alpha_      = 0.15;
     double stationary_thresh_ = 0.01;
+    double ramp_duration_     = 2.0;
 
-    // --- Счётчик логирования IMU ---
-    int imu_log_counter_ = 0;
+    // --- Startup ramp ---
+    FootPosition spawn_foot_;
 };
 
 }  // namespace dog_brain
