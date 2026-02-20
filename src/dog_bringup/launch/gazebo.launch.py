@@ -22,6 +22,14 @@ def generate_launch_description():
     doc = xacro.process_file(urdf_file)
     robot_description_str = doc.toxml().replace('|', '')
 
+    # Gazebo Classic cannot resolve package:// URIs when URDF is passed as a
+    # string (converts them to model:// and fails to find files in Fuel DB).
+    # Replace package://dog_description with absolute file:// path.
+    robot_description_str = robot_description_str.replace(
+        'package://dog_description',
+        'file://' + desc_pkg_share
+    )
+
     robot_description = {"robot_description": robot_description_str}
 
     node_robot_state_publisher = Node(
@@ -39,6 +47,7 @@ def generate_launch_description():
             "-s", "libgazebo_ros_init.so",
             "-s", "libgazebo_ros_factory.so",
         ],
+        additional_env={"GAZEBO_MODEL_DATABASE_URI": ""},
         output="screen",
     )
 
