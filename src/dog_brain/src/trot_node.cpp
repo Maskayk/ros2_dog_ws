@@ -22,17 +22,14 @@ class TrotNode : public rclcpp::Node
 public:
     TrotNode() : Node("trot_node")
     {
-        // --- Параметры походки ---
         this->declare_parameter("gait.period", 0.6);
         this->declare_parameter("gait.duty_factor", 0.65);
 
-        // --- Параметры траектории ---
         this->declare_parameter("trajectory.z_nominal", -0.22);
-        this->declare_parameter("trajectory.step_height", 0.03);
+        this->declare_parameter("trajectory.step_height", 0.04);
         this->declare_parameter("trajectory.step_amp_x", 0.03);
         this->declare_parameter("trajectory.yaw_lever", 0.08);
 
-        // --- Параметры стабилизации ---
         this->declare_parameter("stabilization.enabled", false);
         this->declare_parameter("stabilization.kp_roll", 0.0);
         this->declare_parameter("stabilization.kp_pitch", 0.0);
@@ -41,16 +38,16 @@ public:
         this->declare_parameter("stabilization.max_correction_z", 0.02);
         this->declare_parameter("stabilization.max_correction_x", 0.02);
 
-        // --- Параметры фильтра ---
         this->declare_parameter("filter.alpha", 0.15);
         this->declare_parameter("filter.stationary_threshold", 0.01);
 
-        // --- Параметры startup ramp ---
+        // Startup: ramp joints from spawn pose (thigh=0, knee=-0.3) to
+        // standing pose over ramp_duration seconds, then hold for settle_time.
         this->declare_parameter("startup.ramp_duration", 2.0);
+        this->declare_parameter("startup.settle_time", 0.5);
 
         loadParameters();
 
-        // --- ROS интерфейсы ---
         publisher_ = this->create_publisher<std_msgs::msg::Float64MultiArray>(
             "/joint_group_position_controller/commands", 10);
 
@@ -67,28 +64,25 @@ public:
 
         start_time_ = this->now();
 
-        // Вычисляем стопу в spawn-позе (thigh=0, shin=-0.3)
-        LegJoints spawn_joints;
-        spawn_joints.thigh = 0.0;
-        spawn_joints.knee = -0.3;
-        spawn_foot_ = kinematics_.solveFK(spawn_joints, 1.0);
+        // Compute standing joints once at startup
+        FootPosition stand_pos = trajectory_.standingPose();
+        standing_q_ = kinematics_.solveIK(stand_pos, 1.0);
 
         RCLCPP_INFO(this->get_logger(),
-            "TrotNode started. Spawn foot: x=%.3f z=%.3f, target z=%.3f, ramp=%.1fs",
-            spawn_foot_.x, spawn_foot_.z,
-            trajectory_.config().z_nominal, ramp_duration_);
+            "TrotNode: z_nominal=%.3f, standing thigh=%.3f knee=%.3f, ramp=%.1fs",
+            trajectory_.config().z_nominal,
+            standing_q_.thigh, standing_q_.knee,
+            ramp_duration_);
     }
 
 private:
     void loadParameters()
     {
-        // Gait
         GaitConfig gc = gait_.config();
         gc.period      = this->get_parameter("gait.period").as_double();
         gc.duty_factor = this->get_parameter("gait.duty_factor").as_double();
         gait_.setConfig(gc);
 
-        // Trajectory
         TrajectoryConfig tc;
         tc.z_nominal   = this->get_parameter("trajectory.z_nominal").as_double();
         tc.step_height = this->get_parameter("trajectory.step_height").as_double();
@@ -96,7 +90,6 @@ private:
         tc.yaw_lever   = this->get_parameter("trajectory.yaw_lever").as_double();
         trajectory_.setConfig(tc);
 
-        // Stabilization
         StabilizationConfig sc;
         sc.enabled          = this->get_parameter("stabilization.enabled").as_bool();
         sc.kp_roll          = this->get_parameter("stabilization.kp_roll").as_double();
@@ -107,12 +100,10 @@ private:
         sc.max_correction_x = this->get_parameter("stabilization.max_correction_x").as_double();
         body_ctrl_.setConfig(sc);
 
-        // Filter
-        filter_alpha_       = this->get_parameter("filter.alpha").as_double();
-        stationary_thresh_  = this->get_parameter("filter.stationary_threshold").as_double();
-
-        // Startup ramp
-        ramp_duration_      = this->get_parameter("startup.ramp_duration").as_double();
+        filter_alpha_      = this->get_parameter("filter.alpha").as_double();
+        stationary_thresh_ = this->get_parameter("filter.stationary_threshold").as_double();
+        ramp_duration_     = this->get_parameter("startup.ramp_duration").as_double();
+        settle_time_       = this->get_parameter("startup.settle_time").as_double();
     }
 
     void cmdVelCallback(const geometry_msgs::msg::Twist::SharedPtr msg)
@@ -132,68 +123,65 @@ private:
 
     void timerCallback()
     {
-        loadParameters();
-
         double elapsed = (this->now() - start_time_).seconds();
 
-        // === ФАЗА 1: Startup ramp (плавный переход от spawn позы к стойке) ===
+        // === ФАЗА 1: Плавный рамп от spawn-позы к стойке ===
+        // Интерполируем углы суставов напрямую, избегая резких команд PID.
+        // spawn: thigh=0.0, knee=-0.3  (initial_value, PID error=0 при старте)
+        // target: standing_q_ (IK z_nominal)
         if (elapsed < ramp_duration_) {
-            // Smoothstep интерполяция: 3t^2-2t^3
             double t = elapsed / ramp_duration_;
-            double alpha = 3.0 * t * t - 2.0 * t * t * t;
+            double alpha = t * t * (3.0 - 2.0 * t);  // smoothstep
 
-            FootPosition target = trajectory_.standingPose(); // (0, 0, z_nominal)
-            FootPosition foot;
-            foot.x = spawn_foot_.x * (1.0 - alpha) + target.x * alpha;
-            foot.z = spawn_foot_.z * (1.0 - alpha) + target.z * alpha;
-            foot.y = 0.0;
+            LegJoints q;
+            q.hip   = 0.0;
+            q.thigh = SPAWN_THIGH * (1.0 - alpha) + standing_q_.thigh * alpha;
+            q.knee  = SPAWN_KNEE  * (1.0 - alpha) + standing_q_.knee  * alpha;
 
-            LegJoints q = kinematics_.solveIK(foot, 1.0);
             QuadJoints joints;
-            for (int i = 0; i < LEG_COUNT; ++i) {
-                joints[i] = q;
-            }
+            for (int i = 0; i < LEG_COUNT; ++i) joints[i] = q;
             publishJoints(joints);
             return;
         }
 
-        // === ФАЗА 2: Нормальная работа ===
+        // === ФАЗА 2: Удержание стойки (settle_time после рампа) ===
+        if (elapsed < ramp_duration_ + settle_time_) {
+            publishStanding();
+            return;
+        }
+
+        // === ФАЗА 3: Нормальная работа ===
         smoothed_vel_.vx   += (cmd_vel_.vx   - smoothed_vel_.vx)   * filter_alpha_;
         smoothed_vel_.vy   += (cmd_vel_.vy   - smoothed_vel_.vy)   * filter_alpha_;
         smoothed_vel_.vyaw += (cmd_vel_.vyaw - smoothed_vel_.vyaw) * filter_alpha_;
 
-        QuadJoints joints;
-
-        // Стойка если нет команды
         if (std::abs(smoothed_vel_.vx)   < stationary_thresh_ &&
             std::abs(smoothed_vel_.vy)   < stationary_thresh_ &&
             std::abs(smoothed_vel_.vyaw) < stationary_thresh_)
         {
-            FootPosition stand = trajectory_.standingPose();
-            LegJoints q = kinematics_.solveIK(stand, 1.0);
-            for (int i = 0; i < LEG_COUNT; ++i) {
-                joints[i] = q;
-            }
-            publishJoints(joints);
+            publishStanding();
             return;
         }
 
-        // Вычисляем фазы походки (время считаем от конца ramp)
-        double walk_time = elapsed - ramp_duration_;
+        double walk_time = elapsed - ramp_duration_ - settle_time_;
         auto phases = gait_.update(walk_time);
-
-        // Коррекции от IMU
         auto corrections = body_ctrl_.computeCorrections();
 
+        QuadJoints joints;
         for (int i = 0; i < LEG_COUNT; ++i) {
             FootPosition foot = trajectory_.compute(phases[i], smoothed_vel_, static_cast<LegId>(i));
-
             foot.x += corrections[i].x;
             foot.z += corrections[i].z;
-
             joints[i] = kinematics_.solveIK(foot, LEG_SIGN_Y[i]);
         }
 
+        publishJoints(joints);
+    }
+
+    void publishStanding()
+    {
+        QuadJoints joints;
+        for (int i = 0; i < LEG_COUNT; ++i) joints[i] = standing_q_;
         publishJoints(joints);
     }
 
@@ -201,40 +189,39 @@ private:
     {
         std_msgs::msg::Float64MultiArray msg;
         msg.data.resize(TOTAL_JOINTS);
-
         for (int i = 0; i < LEG_COUNT; ++i) {
             msg.data[i * JOINTS_PER_LEG + 0] = joints[i].hip;
             msg.data[i * JOINTS_PER_LEG + 1] = joints[i].thigh;
             msg.data[i * JOINTS_PER_LEG + 2] = joints[i].knee;
         }
-
         publisher_->publish(msg);
     }
 
-    // --- Библиотечные компоненты ---
+    // Must match URDF initial_value = physical spawn.
+    // Shin spawns clamped to upper limit -0.5, thigh at 0.
+    // Zero PID error at startup = no violent leg movement during fall.
+    static constexpr double SPAWN_THIGH = 0.0;
+    static constexpr double SPAWN_KNEE  = -0.5;
+
     LegKinematics  kinematics_;
     GaitGenerator   gait_;
     FootTrajectory  trajectory_;
     BodyController  body_ctrl_;
 
-    // --- ROS интерфейсы ---
     rclcpp::TimerBase::SharedPtr timer_;
     rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr publisher_;
     rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_sub_;
     rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_sub_;
     rclcpp::Time start_time_;
 
-    // --- Состояние ---
     VelocityCommand cmd_vel_;
     VelocityCommand smoothed_vel_;
+    LegJoints standing_q_;  // IK of z_nominal, computed once at startup
 
-    // --- Параметры ---
     double filter_alpha_      = 0.15;
     double stationary_thresh_ = 0.01;
     double ramp_duration_     = 2.0;
-
-    // --- Startup ramp ---
-    FootPosition spawn_foot_;
+    double settle_time_       = 0.5;
 };
 
 }  // namespace dog_brain

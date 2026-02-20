@@ -7,7 +7,7 @@ namespace dog_brain {
 
 struct TrajectoryConfig {
     double z_nominal   = -0.22;  // номинальная высота стойки (м, совпадает с URDF init_pos)
-    double step_height = 0.03;   // максимальный подъём стопы при swing (м)
+    double step_height = 0.04;   // максимальный подъём стопы при swing (м)
     double step_amp_x  = 0.03;   // масштаб амплитуды шага вперёд
     double yaw_lever   = 0.08;   // плечо для преобразования yaw -> x (м)
 };

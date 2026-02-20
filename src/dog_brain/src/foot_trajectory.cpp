@@ -14,9 +14,11 @@ FootPosition FootTrajectory::compute(const LegPhaseInfo& phase_info,
 {
     int idx = static_cast<int>(leg);
 
-    // Вклад поворота yaw в продольное смещение (из оригинала: -vel_yaw * signs_y[i] * 0.1)
+    // total_x определяется с учётом знака физической оси thigh:
+    // FK.foot.x = -x_physical, поэтому для движения вперёд нужен отрицательный total_x
+    // при положительном vx. Отрицаем всё выражение.
     double rot_x = -vel.vyaw * LEG_SIGN_Y[idx] * config_.yaw_lever;
-    double total_x = (vel.vx * config_.step_amp_x) + rot_x;
+    double total_x = -(vel.vx * config_.step_amp_x + rot_x);
 
     if (phase_info.state == LegState::SWING) {
         return swingTrajectory(phase_info.phase, total_x);

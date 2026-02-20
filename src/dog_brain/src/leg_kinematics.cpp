@@ -38,7 +38,7 @@ LegJoints LegKinematics::solveIK(const FootPosition& foot, double /*side*/) cons
                        d * d - geom_.l_shin * geom_.l_shin) /
                       (2.0 * geom_.l_thigh * d);
     cos_beta = std::clamp(cos_beta, -1.0, 1.0);
-    joints.thigh = std::atan2(-foot.x, -foot.z) + std::acos(cos_beta);
+    joints.thigh = std::atan2(foot.x, -foot.z) + std::acos(cos_beta);
 
     return joints;
 }

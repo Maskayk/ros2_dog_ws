@@ -1,6 +1,6 @@
 controller_manager:
   ros__parameters:
-    update_rate: 200
+    update_rate: 100
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
     joint_group_position_controller:
@@ -27,18 +27,15 @@ joint_group_position_controller:
 gazebo_ros2_control:
   ros__parameters:
     pid_gains:
-      # Hip joints
-      front_left_hip_joint:    {p: 20.0, i: 0.0, d: 1.0}
-      front_right_hip_joint:   {p: 20.0, i: 0.0, d: 1.0}
-      rear_left_hip_joint:     {p: 20.0, i: 0.0, d: 1.0}
-      rear_right_hip_joint:    {p: 20.0, i: 0.0, d: 1.0}
-      # Thigh joints
-      front_left_thigh_joint:  {p: 30.0, i: 0.0, d: 2.0}
-      front_right_thigh_joint: {p: 30.0, i: 0.0, d: 2.0}
-      rear_left_thigh_joint:   {p: 30.0, i: 0.0, d: 2.0}
-      rear_right_thigh_joint:  {p: 30.0, i: 0.0, d: 2.0}
-      # Shin joints
-      front_left_shin_joint:   {p: 30.0, i: 0.0, d: 2.0}
-      front_right_shin_joint:  {p: 30.0, i: 0.0, d: 2.0}
-      rear_left_shin_joint:    {p: 30.0, i: 0.0, d: 2.0}
-      rear_right_shin_joint:   {p: 30.0, i: 0.0, d: 2.0}
+      front_left_hip_joint:    {p: 80.0, i: 0.0, d: 2.0}
+      front_left_thigh_joint:  {p: 80.0, i: 0.0, d: 2.0}
+      front_left_shin_joint:   {p: 80.0, i: 0.0, d: 2.0}
+      front_right_hip_joint:   {p: 80.0, i: 0.0, d: 2.0}
+      front_right_thigh_joint: {p: 80.0, i: 0.0, d: 2.0}
+      front_right_shin_joint:  {p: 80.0, i: 0.0, d: 2.0}
+      rear_left_hip_joint:     {p: 80.0, i: 0.0, d: 2.0}
+      rear_left_thigh_joint:   {p: 80.0, i: 0.0, d: 2.0}
+      rear_left_shin_joint:    {p: 80.0, i: 0.0, d: 2.0}
+      rear_right_hip_joint:    {p: 80.0, i: 0.0, d: 2.0}
+      rear_right_thigh_joint:  {p: 80.0, i: 0.0, d: 2.0}
+      rear_right_shin_joint:   {p: 80.0, i: 0.0, d: 2.0}
