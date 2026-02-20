@@ -6,10 +6,11 @@
 namespace dog_brain {
 
 struct TrajectoryConfig {
-    double z_nominal   = -0.22;  // номинальная высота стойки (м, совпадает с URDF init_pos)
-    double step_height = 0.04;   // максимальный подъём стопы при swing (м)
-    double step_amp_x  = 0.03;   // масштаб амплитуды шага вперёд
-    double yaw_lever   = 0.08;   // плечо для преобразования yaw -> x (м)
+    double z_nominal   = -0.22;  // nominal standing height (m)
+    double x_standing  = 0.03;   // FK foot.x offset for CoM compensation (m)
+    double step_height = 0.04;   // max foot lift during swing (m)
+    double step_amp_x  = 0.03;   // forward step amplitude scale
+    double yaw_lever   = 0.08;   // yaw to x lever arm (m)
 };
 
 class FootTrajectory {

@@ -5,8 +5,9 @@ trot_node:
       duty_factor: 0.6     # 60% stance, 40% swing (стандартный trot)
 
     trajectory:
-      z_nominal: -0.22     # высота стойки (м)
-      step_height: 0.04    # подъём стопы при swing (м)
+      z_nominal: -0.22     # standing height (m)
+      x_standing: 0.03     # FK foot.x offset for CoM compensation (m)
+      step_height: 0.04    # foot lift during swing (m)
       step_amp_x: 0.06     # амплитуда шага (м на 1 м/с)
       yaw_lever: 0.08      # плечо для поворота (м)
 

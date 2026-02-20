@@ -26,6 +26,7 @@ public:
         this->declare_parameter("gait.duty_factor", 0.65);
 
         this->declare_parameter("trajectory.z_nominal", -0.22);
+        this->declare_parameter("trajectory.x_standing", 0.03);
         this->declare_parameter("trajectory.step_height", 0.04);
         this->declare_parameter("trajectory.step_amp_x", 0.03);
         this->declare_parameter("trajectory.yaw_lever", 0.08);
@@ -85,6 +86,7 @@ private:
 
         TrajectoryConfig tc;
         tc.z_nominal   = this->get_parameter("trajectory.z_nominal").as_double();
+        tc.x_standing  = this->get_parameter("trajectory.x_standing").as_double();
         tc.step_height = this->get_parameter("trajectory.step_height").as_double();
         tc.step_amp_x  = this->get_parameter("trajectory.step_amp_x").as_double();
         tc.yaw_lever   = this->get_parameter("trajectory.yaw_lever").as_double();
@@ -125,10 +127,10 @@ private:
     {
         double elapsed = (this->now() - start_time_).seconds();
 
-        // === ФАЗА 1: Плавный рамп от spawn-позы к стойке ===
-        // Интерполируем углы суставов напрямую, избегая резких команд PID.
-        // spawn: thigh=0.0, knee=-0.3  (initial_value, PID error=0 при старте)
-        // target: standing_q_ (IK z_nominal)
+        // === PHASE 1: Joint-space ramp from spawn to standing ===
+        // Smoothstep interpolation of joint angles. Starts exactly at
+        // SPAWN values (= what PID is currently holding) so PID error = 0
+        // at t=0, no jump.
         if (elapsed < ramp_duration_) {
             double t = elapsed / ramp_duration_;
             double alpha = t * t * (3.0 - 2.0 * t);  // smoothstep

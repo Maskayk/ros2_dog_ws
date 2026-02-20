@@ -86,7 +86,7 @@
 
         <link name="${prefix}_shin">
             <visual>
-                <origin xyz="0 0 0" rpy="-1.5707963 0 0"/>
+                <origin xyz="-0.025 0 -0.03" rpy="-1.5707963 0 0"/>
                 <geometry><mesh filename="package://dog_description/meshes/leg11.STL" scale="0.001 0.001 0.001"/></geometry>
                 <material name="black"/>
             </visual>
@@ -95,10 +95,7 @@
                 <geometry><sphere radius="0.03"/></geometry>
                 <surface>
                     <friction>
-                        <ode>
-                            <mu>1.0</mu>
-                            <mu2>1.0</mu2>
-                        </ode>
+                        <ode><mu>1.0</mu><mu2>1.0</mu2></ode>
                     </friction>
                     <contact>
                         <ode>
@@ -112,6 +109,14 @@
             </collision>
             <xacro:leg_inertia m="${leg_m}"/>
         </link>
+        <gazebo reference="${prefix}_shin">
+            <mu1>1.0</mu1>
+            <mu2>1.0</mu2>
+            <kp>500000</kp>
+            <kd>100</kd>
+            <minDepth>0.003</minDepth>
+            <maxVel>0</maxVel>
+        </gazebo>
 
     </xacro:macro>
 
