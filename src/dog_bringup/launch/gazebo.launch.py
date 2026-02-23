@@ -51,8 +51,8 @@ def generate_launch_description():
         output="screen",
     )
 
-    # Spawn at z=0.35. Physical joints land at thigh=0, shin=-0.3 (clamped by limits).
-    # initial_value=0.5/-1.1 (ef73995 working config) -> PID gently pulls to partial stand.
+    # Spawn at z=0.35. Physical joints land at thigh=0, shin=-0.5 (clamped by upper limit).
+    # initial_value=0.0/-0.5 matches physical spawn -> zero PID error at activation.
     spawn_entity = Node(
         package="gazebo_ros",
         executable="spawn_entity.py",

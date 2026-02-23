@@ -39,9 +39,9 @@ FootPosition FootTrajectory::swingTrajectory(double p, double total_x) const
 {
     FootPosition foot;
 
-    // Smoothstep для X: 3p² - 2p³, отображаем на [-total_x, +total_x]
+    // Smoothstep для X: 3p² - 2p³, центрируем вокруг x_standing
     double smooth_p = 3.0 * p * p - 2.0 * p * p * p;
-    foot.x = total_x * (2.0 * smooth_p - 1.0);
+    foot.x = config_.x_standing + total_x * (2.0 * smooth_p - 1.0);
 
     // Полиномиальный подъём для Z: 16p²(1-p)² — колокол с нулевой скоростью на концах
     foot.z = config_.z_nominal + config_.step_height * 16.0 * p * p * (1.0 - p) * (1.0 - p);
@@ -55,8 +55,8 @@ FootPosition FootTrajectory::stanceTrajectory(double p, double total_x) const
 {
     FootPosition foot;
 
-    // Линейный push-back: от +total_x к -total_x
-    foot.x = total_x * (1.0 - 2.0 * p);
+    // Линейный push-back: от x_standing+total_x к x_standing-total_x
+    foot.x = config_.x_standing + total_x * (1.0 - 2.0 * p);
     foot.z = config_.z_nominal;
     foot.y = 0.0;
 
