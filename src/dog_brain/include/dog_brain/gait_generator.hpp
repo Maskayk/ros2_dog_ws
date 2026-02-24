@@ -17,8 +17,8 @@ struct LegPhaseInfo {
 };
 
 struct GaitConfig {
-    double period      = 0.6;
-    double duty_factor = 0.65;  // доля stance (65% stance, 35% swing — более устойчиво)
+    double period      = 0.8;
+    double duty_factor = 0.6;   // 60% stance, 40% swing (standard trot)
 
     // Фазовые смещения для каждой ноги [FL, FR, RL, RR]
     // Trot: диагональные пары синхронны

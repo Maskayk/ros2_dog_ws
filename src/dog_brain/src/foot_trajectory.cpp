@@ -29,9 +29,6 @@ FootPosition FootTrajectory::compute(const LegPhaseInfo& phase_info,
 
 FootPosition FootTrajectory::standingPose() const
 {
-    // Trunk CoM is at x=-0.05m. To place support polygon center under CoM,
-    // shift all feet by ~+0.03 in FK space (physically backward).
-    // Without this offset the robot slowly pitches and drifts.
     return {config_.x_standing, 0.0, config_.z_nominal};
 }
 

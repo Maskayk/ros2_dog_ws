@@ -6,7 +6,7 @@ trot_node:
 
     trajectory:
       z_nominal: -0.25     # standing height (m)
-      x_standing: 0.0      # FK foot.x offset for CoM compensation (m)
+      x_standing: 0.0      # FK foot.x offset — keep 0: nonzero tilts legs -> horizontal reaction -> sliding
       step_height: 0.04    # foot lift during swing (m)
       step_amp_x: 0.06     # амплитуда шага (м на 1 м/с)
       yaw_lever: 0.08      # плечо для поворота (м)

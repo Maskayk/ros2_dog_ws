@@ -22,30 +22,30 @@ class TrotNode : public rclcpp::Node
 public:
     TrotNode() : Node("trot_node")
     {
-        this->declare_parameter("gait.period", 0.6);
-        this->declare_parameter("gait.duty_factor", 0.65);
+        this->declare_parameter("gait.period", 0.8);
+        this->declare_parameter("gait.duty_factor", 0.6);
 
-        this->declare_parameter("trajectory.z_nominal", -0.22);
-        this->declare_parameter("trajectory.x_standing", 0.03);
+        this->declare_parameter("trajectory.z_nominal", -0.25);
+        this->declare_parameter("trajectory.x_standing", 0.0);
         this->declare_parameter("trajectory.step_height", 0.04);
-        this->declare_parameter("trajectory.step_amp_x", 0.03);
+        this->declare_parameter("trajectory.step_amp_x", 0.06);
         this->declare_parameter("trajectory.yaw_lever", 0.08);
 
         this->declare_parameter("stabilization.enabled", false);
-        this->declare_parameter("stabilization.kp_roll", 0.0);
-        this->declare_parameter("stabilization.kp_pitch", 0.0);
+        this->declare_parameter("stabilization.kp_roll", 0.3);
+        this->declare_parameter("stabilization.kp_pitch", 0.3);
         this->declare_parameter("stabilization.kd_roll", 0.0);
         this->declare_parameter("stabilization.kd_pitch", 0.0);
         this->declare_parameter("stabilization.max_correction_z", 0.02);
         this->declare_parameter("stabilization.max_correction_x", 0.02);
 
-        this->declare_parameter("filter.alpha", 0.15);
-        this->declare_parameter("filter.stationary_threshold", 0.01);
+        this->declare_parameter("filter.alpha", 0.1);
+        this->declare_parameter("filter.stationary_threshold", 0.02);
 
-        // Startup: ramp joints from spawn pose (thigh=0, knee=-0.3) to
-        // standing pose over ramp_duration seconds, then hold for settle_time.
-        this->declare_parameter("startup.ramp_duration", 2.0);
+        this->declare_parameter("startup.ramp_duration", 1.5);
         this->declare_parameter("startup.settle_time", 0.5);
+
+        this->declare_parameter("cmd_vel_timeout", 0.5);
 
         loadParameters();
 
@@ -64,6 +64,7 @@ public:
             20ms, std::bind(&TrotNode::timerCallback, this));
 
         start_time_ = this->now();
+        last_cmd_time_ = this->now();
 
         // Compute standing joints once at startup
         FootPosition stand_pos = trajectory_.standingPose();
@@ -106,6 +107,7 @@ private:
         stationary_thresh_ = this->get_parameter("filter.stationary_threshold").as_double();
         ramp_duration_     = this->get_parameter("startup.ramp_duration").as_double();
         settle_time_       = this->get_parameter("startup.settle_time").as_double();
+        cmd_vel_timeout_   = this->get_parameter("cmd_vel_timeout").as_double();
     }
 
     void cmdVelCallback(const geometry_msgs::msg::Twist::SharedPtr msg)
@@ -113,6 +115,7 @@ private:
         cmd_vel_.vx   = msg->linear.x;
         cmd_vel_.vy   = msg->linear.y;
         cmd_vel_.vyaw = msg->angular.z;
+        last_cmd_time_ = this->now();
     }
 
     void imuCallback(const sensor_msgs::msg::Imu::SharedPtr msg)
@@ -128,9 +131,6 @@ private:
         double elapsed = (this->now() - start_time_).seconds();
 
         // === PHASE 1: Joint-space ramp from spawn to standing ===
-        // Smoothstep interpolation of joint angles. Starts exactly at
-        // SPAWN values (= what PID is currently holding) so PID error = 0
-        // at t=0, no jump.
         if (elapsed < ramp_duration_) {
             double t = elapsed / ramp_duration_;
             double alpha = t * t * (3.0 - 2.0 * t);  // smoothstep
@@ -146,26 +146,46 @@ private:
             return;
         }
 
-        // === ФАЗА 2: Удержание стойки (settle_time после рампа) ===
+        // === PHASE 2: Hold standing (settle after ramp) ===
         if (elapsed < ramp_duration_ + settle_time_) {
             publishStanding();
             return;
         }
 
-        // === ФАЗА 3: Нормальная работа ===
+        // === PHASE 3: Normal operation ===
+
+        // cmd_vel timeout: zero out if no message received recently.
+        // teleop_twist_keyboard sends zero ONCE on key release — if that
+        // packet is lost, cmd_vel_ stays nonzero forever without this.
+        if ((this->now() - last_cmd_time_).seconds() > cmd_vel_timeout_) {
+            cmd_vel_ = {};
+        }
+
+        // EWM filter on velocity
         smoothed_vel_.vx   += (cmd_vel_.vx   - smoothed_vel_.vx)   * filter_alpha_;
         smoothed_vel_.vy   += (cmd_vel_.vy   - smoothed_vel_.vy)   * filter_alpha_;
         smoothed_vel_.vyaw += (cmd_vel_.vyaw - smoothed_vel_.vyaw) * filter_alpha_;
 
-        if (std::abs(smoothed_vel_.vx)   < stationary_thresh_ &&
-            std::abs(smoothed_vel_.vy)   < stationary_thresh_ &&
-            std::abs(smoothed_vel_.vyaw) < stationary_thresh_)
-        {
+        bool stationary = std::abs(smoothed_vel_.vx)   < stationary_thresh_ &&
+                          std::abs(smoothed_vel_.vy)   < stationary_thresh_ &&
+                          std::abs(smoothed_vel_.vyaw) < stationary_thresh_;
+
+        if (stationary) {
+            walking_ = false;
             publishStanding();
             return;
         }
 
-        double walk_time = elapsed - ramp_duration_ - settle_time_;
+        // Transition standing -> walking: reset gait clock so that
+        // all legs start in double-support stance (no mid-swing jump).
+        // gc=0.45 puts both diagonal pairs in stance simultaneously.
+        if (!walking_) {
+            walking_ = true;
+            double period = gait_.config().period;
+            gait_start_time_ = elapsed - 0.45 * period;
+        }
+
+        double walk_time = elapsed - gait_start_time_;
         auto phases = gait_.update(walk_time);
         auto corrections = body_ctrl_.computeCorrections();
 
@@ -199,11 +219,9 @@ private:
         publisher_->publish(msg);
     }
 
-    // Must match URDF initial_value = physical spawn.
-    // Shin spawns clamped to upper limit -0.5, thigh at 0.
-    // Zero PID error at startup = no violent leg movement during fall.
+    // Must match URDF initial_value = physical spawn (shin upper limit = -0.1).
     static constexpr double SPAWN_THIGH = 0.0;
-    static constexpr double SPAWN_KNEE  = -0.5;
+    static constexpr double SPAWN_KNEE  = -0.1;
 
     LegKinematics  kinematics_;
     GaitGenerator   gait_;
@@ -215,15 +233,20 @@ private:
     rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_sub_;
     rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_sub_;
     rclcpp::Time start_time_;
+    rclcpp::Time last_cmd_time_;
 
     VelocityCommand cmd_vel_;
     VelocityCommand smoothed_vel_;
-    LegJoints standing_q_;  // IK of z_nominal, computed once at startup
+    LegJoints standing_q_;
 
-    double filter_alpha_      = 0.15;
-    double stationary_thresh_ = 0.01;
-    double ramp_duration_     = 2.0;
+    bool walking_ = false;
+    double gait_start_time_ = 0.0;
+
+    double filter_alpha_      = 0.1;
+    double stationary_thresh_ = 0.02;
+    double ramp_duration_     = 1.5;
     double settle_time_       = 0.5;
+    double cmd_vel_timeout_   = 0.5;
 };
 
 }  // namespace dog_brain

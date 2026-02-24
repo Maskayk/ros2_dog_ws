@@ -6,10 +6,10 @@
 namespace dog_brain {
 
 struct TrajectoryConfig {
-    double z_nominal   = -0.22;  // nominal standing height (m)
-    double x_standing  = 0.03;   // FK foot.x offset for CoM compensation (m)
+    double z_nominal   = -0.25;  // nominal standing height (m)
+    double x_standing  = 0.0;    // FK foot.x offset (keep 0: nonzero tilts legs -> sliding)
     double step_height = 0.04;   // max foot lift during swing (m)
-    double step_amp_x  = 0.03;   // forward step amplitude scale
+    double step_amp_x  = 0.06;   // forward step amplitude scale (m per 1 m/s)
     double yaw_lever   = 0.08;   // yaw to x lever arm (m)
 };
 

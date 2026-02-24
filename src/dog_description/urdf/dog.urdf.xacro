@@ -41,7 +41,7 @@
             <parent link="trunk"/> <child link="${prefix}_hip"/>
             <origin xyz="${side_x * trunk_l/2} ${side_y * trunk_w/2} 0" rpy="0 0 0"/>
             <axis xyz="1 0 0"/>
-            <limit lower="-0.8" upper="0.8" effort="20" velocity="20"/>
+            <limit lower="-1.0" upper="1.0" effort="20" velocity="20"/>
         </joint>
         <gazebo reference="${prefix}_hip_joint">
             <implicitSpringDamper>true</implicitSpringDamper>
@@ -78,7 +78,7 @@
             <parent link="${prefix}_thigh"/> <child link="${prefix}_shin"/>
             <origin xyz="0 0 ${-thigh_l}" rpy="0 0 0"/>
             <axis xyz="0 1 0"/>
-            <limit lower="-4.0" upper="-0.5" effort="20" velocity="20"/>
+            <limit lower="-4.0" upper="-0.1" effort="20" velocity="20"/>
         </joint>
         <gazebo reference="${prefix}_shin_joint">
             <implicitSpringDamper>true</implicitSpringDamper>
@@ -95,7 +95,7 @@
                 <geometry><sphere radius="0.03"/></geometry>
                 <surface>
                     <friction>
-                        <ode><mu>1.0</mu><mu2>1.0</mu2></ode>
+                        <ode><mu>5.0</mu><mu2>5.0</mu2></ode>
                     </friction>
                     <contact>
                         <ode>
@@ -109,14 +109,6 @@
             </collision>
             <xacro:leg_inertia m="${leg_m}"/>
         </link>
-        <gazebo reference="${prefix}_shin">
-            <mu1>1.0</mu1>
-            <mu2>1.0</mu2>
-            <kp>500000</kp>
-            <kd>100</kd>
-            <minDepth>0.003</minDepth>
-            <maxVel>0</maxVel>
-        </gazebo>
 
     </xacro:macro>
 
@@ -146,10 +138,10 @@
             </joint>
         </xacro:macro>
 
-        <xacro:ctrl_joint name="front_left"  thigh_val="0.0" shin_val="-0.5"/>
-        <xacro:ctrl_joint name="front_right" thigh_val="0.0" shin_val="-0.5"/>
-        <xacro:ctrl_joint name="rear_left"   thigh_val="0.0" shin_val="-0.5"/>
-        <xacro:ctrl_joint name="rear_right"  thigh_val="0.0" shin_val="-0.5"/>
+        <xacro:ctrl_joint name="front_left"  thigh_val="0.0" shin_val="-0.1"/>
+        <xacro:ctrl_joint name="front_right" thigh_val="0.0" shin_val="-0.1"/>
+        <xacro:ctrl_joint name="rear_left"   thigh_val="0.0" shin_val="-0.1"/>
+        <xacro:ctrl_joint name="rear_right"  thigh_val="0.0" shin_val="-0.1"/>
     </ros2_control>
 
     <gazebo>

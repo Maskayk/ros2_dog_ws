@@ -51,7 +51,7 @@ def generate_launch_description():
         output="screen",
     )
 
-    # Spawn at z=0.35. Physical joints land at thigh=0, shin=-0.5 (clamped by upper limit).
+    # Spawn at z=0.42. Physical joints land at thigh=0, shin=-0.5 (clamped by upper limit).
     # initial_value=0.0/-0.5 matches physical spawn -> zero PID error at activation.
     spawn_entity = Node(
         package="gazebo_ros",
@@ -59,7 +59,7 @@ def generate_launch_description():
         arguments=[
             "-topic", "robot_description",
             "-entity", "dog",
-            "-z", "0.35",
+            "-z", "0.42",
         ],
         output="screen",
     )
