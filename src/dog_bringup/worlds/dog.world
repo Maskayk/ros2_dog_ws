@@ -6,9 +6,7 @@
       <uri>model://sun</uri>
     </include>
 
-    <!-- Explicit ground plane with guaranteed high friction (mu=100).
-         model://ground_plane may have low default mu depending on Gazebo version,
-         which silently limits effective foot friction to min(foot_mu, ground_mu). -->
+    <!-- High-friction ground plane: mu=100 ensures foot friction is the limiting factor -->
     <model name="ground_plane">
       <static>true</static>
       <link name="link">
@@ -18,12 +16,6 @@
             <friction>
               <ode><mu>100</mu><mu2>100</mu2></ode>
             </friction>
-            <contact>
-              <ode>
-                <kp>1000000</kp>
-                <kd>100</kd>
-              </ode>
-            </contact>
           </surface>
         </collision>
         <visual name="visual">

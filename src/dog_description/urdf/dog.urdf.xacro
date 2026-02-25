@@ -68,9 +68,7 @@
                 <geometry><mesh filename="package://dog_description/meshes/leg22.STL" scale="0.001 0.001 0.001"/></geometry>
                 <material name="gray"/>
             </visual>
-            <collision>
-                <origin xyz="0 0 ${-thigh_l/2}"/><geometry><cylinder radius="${leg_r}" length="${thigh_l - 0.04}"/></geometry>
-            </collision>
+            <!-- No collision on thigh - only foot sphere contacts ground -->
             <xacro:leg_inertia m="${leg_m}"/>
         </link>
 
@@ -93,19 +91,6 @@
             <collision>
                 <origin xyz="0 0 ${-shin_l}"/>
                 <geometry><sphere radius="0.03"/></geometry>
-                <surface>
-                    <friction>
-                        <ode><mu>5.0</mu><mu2>5.0</mu2></ode>
-                    </friction>
-                    <contact>
-                        <ode>
-                            <kp>500000.0</kp>
-                            <kd>100.0</kd>
-                            <minDepth>0.003</minDepth>
-                            <maxVel>0.0</maxVel>
-                        </ode>
-                    </contact>
-                </surface>
             </collision>
             <xacro:leg_inertia m="${leg_m}"/>
         </link>
@@ -125,16 +110,25 @@
                 <command_interface name="position"/>
                 <state_interface name="velocity"/>
                 <state_interface name="position"><param name="initial_value">0.0</param></state_interface>
+                <param name="pos_kp">20.0</param>
+                <param name="pos_ki">0.0</param>
+                <param name="pos_kd">5.0</param>
             </joint>
             <joint name="${name}_thigh_joint">
                 <command_interface name="position"/>
                 <state_interface name="velocity"/>
                 <state_interface name="position"><param name="initial_value">${thigh_val}</param></state_interface>
+                <param name="pos_kp">20.0</param>
+                <param name="pos_ki">0.0</param>
+                <param name="pos_kd">5.0</param>
             </joint>
             <joint name="${name}_shin_joint">
                 <command_interface name="position"/>
                 <state_interface name="velocity"/>
                 <state_interface name="position"><param name="initial_value">${shin_val}</param></state_interface>
+                <param name="pos_kp">20.0</param>
+                <param name="pos_ki">0.0</param>
+                <param name="pos_kd">5.0</param>
             </joint>
         </xacro:macro>
 
@@ -147,6 +141,16 @@
     <gazebo>
         <plugin name="gazebo_ros2_control" filename="libgazebo_ros2_control.so">
             <parameters>$(find dog_bringup)/config/controllers.yaml</parameters>
+        </plugin>
+    </gazebo>
+
+    <!-- Ground truth position monitor - publish base_link pose in world frame -->
+    <gazebo>
+        <plugin name="p3d_base_controller" filename="libgazebo_ros_p3d.so">
+            <ros><remapping>odom:=/ground_truth/state</remapping></ros>
+            <frame_name>world</frame_name>
+            <body_name>base_link</body_name>
+            <update_rate>50</update_rate>
         </plugin>
     </gazebo>
 

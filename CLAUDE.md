@@ -89,11 +89,11 @@ All 12-element arrays (controllers.yaml, types.hpp):
 ## Critical Implementation Details
 
 ### Spawn & PID Setup
-- **Spawn height**: `z=0.35`. Physical joints land at 0/-0.3 (clamped by limits).
-- **initial_value in URDF**: `thigh=0.5, shin=-1.1` — this is the PID setpoint during the 4s launch delay before trot_node starts. PID pulls joints from 0/-0.3 → 0.5/-1.1 gently while robot is on the ground.
-- **trot_node SPAWN_THIGH/SPAWN_KNEE must match URDF initial_value** (both = 0.5/-1.1). Mismatch → PID reversal → robot flips.
-- **PID p=80, d=2** on all joints (controllers.yaml). Without PID, Gazebo uses SetPosition (instant teleport) → robot flies.
-- **No `<dynamics>` on joints** — PID provides all damping; adding dynamics causes instability.
+- **Spawn height**: `z=0.42`. Physical joints land at 0/-0.1 (shin clamped to upper limit=-0.1).
+- **initial_value in URDF**: `thigh=0.0, shin=-0.1` — must match physical spawn position. Mismatch → large PID error → robot flips.
+- **trot_node SPAWN_THIGH/SPAWN_KNEE must match URDF initial_value** (both = 0.0/-0.1).
+- **PID p=40, d=2** on all joints (controllers.yaml). Without PID, Gazebo uses SetPosition (instant teleport) → robot flies.
+- **`<dynamics damping="0.5"/>` on every joint** — REQUIRED for `implicitSpringDamper` to work. Without it, implicitSpringDamper is a no-op (Gazebo checks damping==0 → skips). Provides continuous viscous damping at every ODE substep (1ms), preventing micro-oscillation between PID updates (10ms).
 - **implicitSpringDamper=true** on every joint via `<gazebo reference="...">` — essential for ODE stability.
 
 ### IK Sign Convention

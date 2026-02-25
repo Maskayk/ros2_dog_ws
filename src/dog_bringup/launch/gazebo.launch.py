@@ -51,15 +51,15 @@ def generate_launch_description():
         output="screen",
     )
 
-    # Spawn at z=0.42. Physical joints land at thigh=0, shin=-0.5 (clamped by upper limit).
-    # initial_value=0.0/-0.5 matches physical spawn -> zero PID error at activation.
+    # Spawn at z=0.42. Physical joints land at thigh=0, shin=-0.1 (clamped by upper limit).
+    # initial_value=0.0/-0.1 matches physical spawn -> zero error at activation.
     spawn_entity = Node(
         package="gazebo_ros",
         executable="spawn_entity.py",
         arguments=[
             "-topic", "robot_description",
             "-entity", "dog",
-            "-z", "0.42",
+            "-z", "0.33",
         ],
         output="screen",
     )
@@ -105,6 +105,7 @@ def generate_launch_description():
     # Robot needs time to fall from z=0.35 and settle on the ground.
     # Without this delay, trot_node sends large joint commands while robot
     # is still in the air -> PID error -> violent torques -> robot flies.
+    # Wait 4s after controller activates before starting trot_node.
     start_trot_after_delay = RegisterEventHandler(
         event_handler=OnProcessExit(
             target_action=robot_controller_spawner,
