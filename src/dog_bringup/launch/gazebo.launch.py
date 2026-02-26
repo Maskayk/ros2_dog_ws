@@ -59,7 +59,7 @@ def generate_launch_description():
         arguments=[
             "-topic", "robot_description",
             "-entity", "dog",
-            "-z", "0.33",
+            "-z", "0.42",
         ],
         output="screen",
     )

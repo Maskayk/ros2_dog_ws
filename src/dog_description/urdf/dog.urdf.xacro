@@ -42,10 +42,7 @@
             <origin xyz="${side_x * trunk_l/2} ${side_y * trunk_w/2} 0" rpy="0 0 0"/>
             <axis xyz="1 0 0"/>
             <limit lower="-1.0" upper="1.0" effort="20" velocity="20"/>
-        </joint>
-        <gazebo reference="${prefix}_hip_joint">
-            <implicitSpringDamper>true</implicitSpringDamper>
-        </gazebo>
+                    </joint>
 
         <link name="${prefix}_hip">
             <visual><geometry><box size="0.05 0.05 0.05"/></geometry><material name="black"/></visual>
@@ -57,10 +54,7 @@
             <origin xyz="0 ${side_y * hip_l} 0" rpy="0 0 0"/>
             <axis xyz="0 1 0"/>
             <limit lower="-1.0" upper="4.0" effort="20" velocity="20"/>
-        </joint>
-        <gazebo reference="${prefix}_thigh_joint">
-            <implicitSpringDamper>true</implicitSpringDamper>
-        </gazebo>
+                    </joint>
 
         <link name="${prefix}_thigh">
             <visual>
@@ -77,10 +71,7 @@
             <origin xyz="0 0 ${-thigh_l}" rpy="0 0 0"/>
             <axis xyz="0 1 0"/>
             <limit lower="-4.0" upper="-0.1" effort="20" velocity="20"/>
-        </joint>
-        <gazebo reference="${prefix}_shin_joint">
-            <implicitSpringDamper>true</implicitSpringDamper>
-        </gazebo>
+                    </joint>
 
         <link name="${prefix}_shin">
             <visual>
@@ -110,25 +101,16 @@
                 <command_interface name="position"/>
                 <state_interface name="velocity"/>
                 <state_interface name="position"><param name="initial_value">0.0</param></state_interface>
-                <param name="pos_kp">20.0</param>
-                <param name="pos_ki">0.0</param>
-                <param name="pos_kd">5.0</param>
             </joint>
             <joint name="${name}_thigh_joint">
                 <command_interface name="position"/>
                 <state_interface name="velocity"/>
                 <state_interface name="position"><param name="initial_value">${thigh_val}</param></state_interface>
-                <param name="pos_kp">20.0</param>
-                <param name="pos_ki">0.0</param>
-                <param name="pos_kd">5.0</param>
             </joint>
             <joint name="${name}_shin_joint">
                 <command_interface name="position"/>
                 <state_interface name="velocity"/>
                 <state_interface name="position"><param name="initial_value">${shin_val}</param></state_interface>
-                <param name="pos_kp">20.0</param>
-                <param name="pos_ki">0.0</param>
-                <param name="pos_kd">5.0</param>
             </joint>
         </xacro:macro>
 
