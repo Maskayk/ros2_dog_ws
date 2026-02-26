@@ -6,23 +6,27 @@ A modular ROS 2 / Gazebo Classic simulation of a 12-DOF quadruped robot with tro
 ![Gazebo Classic](https://img.shields.io/badge/Gazebo-Classic%2011-orange)
 ![C++17](https://img.shields.io/badge/C%2B%2B-17-green)
 
+**Language / Язык:** [English](#english) | [Русский](#russian)
+
 ---
 
-## Features
+<a id="english"></a>
 
-- Pure C++ kinematics & gait library with zero ROS dependencies — portable to real hardware
+## English
+
+### Features
+
+- Pure C++ kinematics & gait library (`dog_brain_lib`) with zero ROS dependencies — portable to real hardware
 - 12 joints: 4 legs x 3 DoF (hip\_roll, thigh\_pitch, shin\_pitch)
 - Analytical IK/FK for each leg
 - Trot gait with configurable period, duty factor, and step parameters
-- Smooth startup ramp from spawn pose to standing (no torque spikes)
+- Smooth startup: smoothstep ramp from spawn pose to standing (no torque spikes)
 - IMU-based roll/pitch stabilization (optional)
 - Runtime parameter tuning via `ros2 param set`
 - SolidWorks STL meshes for visual model
-- Ground truth odometry via `libgazebo_ros_p3d`
+- Ground truth odometry via `libgazebo_ros_p3d` (`/ground_truth/state`)
 
----
-
-## Prerequisites
+### Prerequisites
 
 | Dependency | Version |
 |---|---|
@@ -33,10 +37,6 @@ A modular ROS 2 / Gazebo Classic simulation of a 12-DOF quadruped robot with tro
 | gazebo\_ros2\_control | Humble |
 | colcon | latest |
 
-Install ROS 2 Humble and Gazebo Classic following the [official instructions](https://docs.ros.org/en/humble/Installation.html).
-
-Install required ROS packages:
-
 ```bash
 sudo apt install \
   ros-humble-gazebo-ros2-control \
@@ -47,323 +47,213 @@ sudo apt install \
   ros-humble-joint-state-broadcaster
 ```
 
----
-
-## Getting Started
-
-### Clone
+### Getting Started
 
 ```bash
+# Clone
 mkdir -p ~/dog_ws/src
 cd ~/dog_ws/src
 git clone https://github.com/Maskayk/ros2_dog_ws.git .
 cd ~/dog_ws
-```
 
-### Build
-
-```bash
-cd ~/dog_ws
+# Build (--symlink-install required for config hot-reload)
 colcon build --symlink-install
-```
 
-`--symlink-install` is required — it symlinks config files (YAML, launch scripts, meshes) so changes take effect without rebuilding.
-
-### Source
-
-```bash
+# Source
 source ~/dog_ws/install/setup.bash
+# (add to ~/.bashrc for auto-source)
 ```
 
-Add to `~/.bashrc` to source automatically:
+### Running
 
 ```bash
-echo "source ~/dog_ws/install/setup.bash" >> ~/.bashrc
-```
-
----
-
-## Running the Simulation
-
-### Full simulation (Gazebo + controllers + trot gait)
-
-```bash
+# Full simulation (Gazebo + controllers + trot gait)
 ros2 launch dog_bringup gazebo.launch.py
+
+# URDF viewer (RViz only)
+ros2 launch dog_description view_dog.launch.py
 ```
 
-Launch sequence:
+### Launch Sequence
 
 ```
 robot_state_publisher
         |
-      Gazebo
+      Gazebo (ODE @ 2 kHz, step=0.5 ms)
         |
-   spawn_entity  (z=0.33)
+   spawn_entity  (z=0.42, free-fall ~4 s)
         |
 joint_state_broadcaster
         |
-joint_group_position_controller  (position control @ 100 Hz)
+joint_group_position_controller  (SetPosition @ 200 Hz)
         |
-   [4 s delay — robot settles]
+   [4 s delay — settle on ground]
         |
-    trot_node  (gait @ 50 Hz)
+    trot_node  (gait loop @ 50 Hz)
 ```
 
-After launch the robot automatically:
-1. Spawns near the ground (`z = 0.33`, legs nearly touching)
-2. Position controller holds spawn joints (`thigh=0.0, shin=-0.1`)
-3. `trot_node` starts after 4 s delay, ramps to standing pose (1.5 s smoothstep)
-4. Holds standing pose until a `/cmd_vel` command is received
+After launch:
+1. Robot spawns at `z=0.42`, falls and settles (~4 s)
+2. Position controller holds spawn joints (`thigh=0.0, shin=-0.1`) — zero initial error
+3. `trot_node` starts, ramps to standing pose via 1.5 s smoothstep
+4. Holds standing until `/cmd_vel` is received
 
-### URDF viewer (RViz)
-
-```bash
-ros2 launch dog_description view_dog.launch.py
-```
-
----
-
-## Control
-
-### Velocity commands
+### Control
 
 ```bash
-# Move forward at 0.3 m/s
+# Forward 0.3 m/s
 ros2 topic pub /cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.3}}"
 
 # Turn left
 ros2 topic pub /cmd_vel geometry_msgs/msg/Twist "{angular: {z: 0.5}}"
 
-# Stop (or just stop publishing — 0.5 s timeout auto-zeroes velocity)
+# Stop (or just stop publishing — 0.5 s timeout auto-zeroes)
 ros2 topic pub /cmd_vel geometry_msgs/msg/Twist "{}"
 ```
 
-### Runtime parameter tuning
-
-Parameters can be changed while the simulation is running:
+Runtime tuning:
 
 ```bash
 ros2 param set /trot_node gait.period 0.6
 ros2 param set /trot_node trajectory.step_height 0.06
-ros2 param set /trot_node trajectory.step_amp_x 0.08
 ros2 param set /trot_node stabilization.enabled true
 ```
 
-All parameters are defined in [`src/dog_brain/config/gait_params.yaml`](src/dog_brain/config/gait_params.yaml).
+### Architecture
 
----
-
-## Architecture
-
-### Data flow
-
+**Data flow:**
 ```
-/cmd_vel  ───────────────────────────────────────────┐
-                                                      v
-/imu/data ──> [body_controller]           [trot_node @ 50 Hz]
-                                                      |
-                                 /joint_group_position_controller/commands
-                                                      |
-                                                      v
-                                  [gazebo_ros2_control position @ 100 Hz]
-                                                      |
-                                                      v
-                                        [Gazebo ODE @ 1 kHz]
-                                                      |
-                                                      v
-                                               /joint_states
+/cmd_vel ──────────────────────────────────────┐
+                                                v
+/imu/data ──> [body_controller]     [trot_node @ 50 Hz]
+                                                |
+                           /joint_group_position_controller/commands
+                                                |
+                                                v
+                         [gazebo_ros2_control SetPosition @ 200 Hz]
+                                                |
+                                                v
+                                  [Gazebo ODE @ 2 kHz, step=0.5 ms]
+                                                |
+                                                v
+                                         /joint_states
 ```
 
-### Package structure
-
+**Package structure:**
 ```
 dog_ws/src/
-├── dog_description/              # Robot model
-│   ├── urdf/
-│   │   └── dog.urdf.xacro       # Robot description (xacro macro)
-│   ├── meshes/
-│   │   ├── leg11.STL             # Shin link mesh (SolidWorks)
-│   │   └── leg22.STL             # Thigh link mesh (SolidWorks)
-│   ├── config/
-│   │   └── view_dog.rviz        # RViz config
-│   └── launch/
-│       └── view_dog.launch.py
-│
-├── dog_bringup/                  # Simulation launcher
-│   ├── launch/
-│   │   └── gazebo.launch.py     # Main launch file
-│   ├── config/
-│   │   └── controllers.yaml     # Controller type, joint list
-│   └── worlds/
-│       └── dog.world            # Gazebo world (ODE physics)
-│
-└── dog_brain/                    # Gait controller
+├── dog_description/          # Robot model (URDF/xacro, STL meshes)
+├── dog_bringup/              # Launch, controller config, world
+└── dog_brain/                # Gait controller (C++ lib + ROS node)
     ├── include/dog_brain/
-    │   ├── types.hpp             # RobotGeometry, LegJoints, FootPosition
-    │   ├── leg_kinematics.hpp    # solveIK(), solveFK()
-    │   ├── gait_generator.hpp    # Phase offsets — trot: {0, 0.5, 0.5, 0}
-    │   ├── foot_trajectory.hpp   # Swing + stance trajectories
-    │   └── body_controller.hpp   # IMU -> per-leg corrections
-    ├── src/
-    │   ├── leg_kinematics.cpp
-    │   ├── gait_generator.cpp
-    │   ├── foot_trajectory.cpp
-    │   ├── body_controller.cpp
-    │   └── trot_node.cpp         # ROS 2 node (thin wrapper)
-    └── config/
-        └── gait_params.yaml      # Runtime-tunable parameters
+    │   ├── types.hpp         # Geometry, LegJoints, FootPosition
+    │   ├── leg_kinematics.hpp # solveIK(), solveFK()
+    │   ├── gait_generator.hpp # Phase offsets — trot: {0, 0.5, 0.5, 0}
+    │   ├── foot_trajectory.hpp # Swing + stance foot paths
+    │   └── body_controller.hpp # IMU -> per-leg Z/X corrections
+    └── src/trot_node.cpp     # ROS node: params, timer, publish
 ```
 
-### `dog_brain` module breakdown
+**Module roles:**
 
-| Module | Responsibility |
+| Module | Role |
 |---|---|
-| `types.hpp` | All shared data structures and geometry constants |
-| `leg_kinematics` | Analytical IK and FK for a 3-DoF leg |
-| `gait_generator` | Per-leg phase computation from time and gait params |
-| `foot_trajectory` | Swing (smoothstep-X + polynomial-Z) and stance (linear push-back) |
+| `types.hpp` | Shared structs, geometry constants, leg sign arrays |
+| `leg_kinematics` | Analytical IK/FK for 3-DoF leg |
+| `gait_generator` | Per-leg phase from time + gait config |
+| `foot_trajectory` | Swing (smoothstep-X, polynomial-Z), stance (linear push-back) |
 | `body_controller` | IMU quaternion -> Euler -> per-leg Z/X corrections |
-| `trot_node` | ROS subscriptions/publications, parameter loading, 50 Hz timer |
+| `trot_node` | Thin ROS wrapper: subscriptions, parameter loading, 50 Hz timer |
 
----
-
-## Robot Geometry
+### Robot Geometry
 
 | Parameter | Value |
 |---|---|
-| Hip link length | 0.06 m |
-| Thigh link length | 0.144 m |
-| Shin link length | 0.1525 m |
-| Trunk length | 0.475 m |
-| Trunk width | 0.18 m |
-| Trunk height | 0.10 m |
+| Hip link | 0.06 m |
+| Thigh link | 0.144 m |
+| Shin link | 0.1525 m |
+| Trunk (L x W x H) | 0.475 x 0.18 x 0.10 m |
 | Trunk mass | 6.0 kg |
 | Leg link mass | 0.5 kg (thigh, shin), 0.2 kg (hip) |
-| Foot sphere radius | 0.03 m |
-| Standing height (`z_nominal`) | -0.25 m |
+| Foot sphere | r = 0.03 m |
+| Standing height (z\_nominal) | -0.25 m |
 | Total mass | ~10.8 kg |
 
-**Joint order** (12-element arrays in `controllers.yaml` and `types.hpp`):
+**Joint order** (12-element arrays):
 ```
-FL_hip, FL_thigh, FL_shin,
-FR_hip, FR_thigh, FR_shin,
-RL_hip, RL_thigh, RL_shin,
-RR_hip, RR_thigh, RR_shin
+FL_hip, FL_thigh, FL_shin,  FR_hip, FR_thigh, FR_shin,
+RL_hip, RL_thigh, RL_shin,  RR_hip, RR_thigh, RR_shin
 ```
 
----
+### Gait Parameters
 
-## Gait Parameters
-
-All parameters live in `src/dog_brain/config/gait_params.yaml` and can be tuned at runtime.
+All in `src/dog_brain/config/gait_params.yaml`, tunable at runtime.
 
 | Parameter | Default | Description |
 |---|---|---|
-| `gait.period` | 0.8 s | Duration of one full gait cycle |
-| `gait.duty_factor` | 0.6 | Fraction of cycle in stance (60%) |
-| `trajectory.z_nominal` | -0.25 m | Nominal foot height (standing depth) |
-| `trajectory.x_standing` | 0.0 m | FK foot X offset (must be 0 to avoid sliding) |
-| `trajectory.step_height` | 0.04 m | Max foot lift during swing |
-| `trajectory.step_amp_x` | 0.06 m | Forward step amplitude scale |
-| `trajectory.yaw_lever` | 0.08 m | Yaw-to-X lever arm |
-| `startup.ramp_duration` | 1.5 s | Smoothstep ramp from spawn to standing pose |
-| `startup.settle_time` | 0.5 s | Hold standing before accepting cmd\_vel |
-| `cmd_vel_timeout` | 0.5 s | Zero velocity if no cmd\_vel received |
+| `gait.period` | 0.8 s | Full gait cycle duration |
+| `gait.duty_factor` | 0.6 | Stance fraction (60%) |
+| `trajectory.z_nominal` | -0.25 m | Standing depth |
+| `trajectory.x_standing` | 0.0 m | Foot X offset (keep 0) |
+| `trajectory.step_height` | 0.04 m | Swing foot lift |
+| `trajectory.step_amp_x` | 0.06 m | Forward step scale |
+| `trajectory.yaw_lever` | 0.08 m | Yaw lever arm |
+| `startup.ramp_duration` | 1.5 s | Spawn-to-standing ramp |
+| `startup.settle_time` | 0.5 s | Hold before gait |
+| `cmd_vel_timeout` | 0.5 s | Auto-zero on no cmd\_vel |
 
----
-
-## trot\_node Startup Sequence
+### trot\_node Startup
 
 | Phase | Time | Action |
 |---|---|---|
-| Ramp | 0 - 1.5 s | Smoothstep interpolation from spawn pose (thigh=0, shin=-0.1) to standing |
+| Ramp | 0 - 1.5 s | Smoothstep from spawn (thigh=0, shin=-0.1) to standing |
 | Settle | 1.5 - 2.0 s | Hold standing pose |
-| Normal | 2.0 s+ | Accept /cmd\_vel; stand if stationary, walk if velocity above threshold |
+| Normal | 2.0 s+ | Accept /cmd\_vel; stand or walk |
+
+### Updating STL Meshes
+
+1. Export STL from SolidWorks (units: mm)
+2. Place in `src/dog_description/meshes/`
+3. Reference with `scale="0.001 0.001 0.001"` (mm to m)
+4. Keep `<collision>` as simple primitives (never STL)
+5. Mirror: export separate mirrored STL (negative scale breaks normals in Gazebo)
+
+### Known Issues
+
+| Issue | Notes |
+|---|---|
+| Forward drift ~20 mm/s standing | Gazebo Classic SetPosition artifact on bent legs. Reduced 2x by `max_step_size=0.0005`. Full fix requires effort-based (torque) control. |
+| Right-side mesh orientation | FR/RR legs need mirrored STL from SolidWorks |
+
+### Implementation Notes
+
+**IK sign convention:** Thigh axis `xyz="0 1 0"`. Positive angle = foot moves -X (backward). FK: `foot.x = +L*sin(thigh)` but physically backward. For forward motion `total_x` must be negated.
+
+**xacro `|` fix:** `xacro.process_file().toxml()` adds `|` chars that break `gazebo_ros2_control`. Launch strips them: `.replace('|', '')`. URDF comments must be ASCII-only.
+
+**initial\_value matching:** `initial_value` in `<ros2_control>` must match physical spawn position. Current: `thigh=0.0, shin=-0.1` (shin clamped to upper limit). Mismatch = flip.
+
+**Foot contact:** Only foot sphere (r=0.03 at shin tip) has collision. No collision on thigh/shin body.
 
 ---
 
-## Updating STL Meshes from SolidWorks
+<a id="russian"></a>
 
-1. Export each part as STL from SolidWorks (File -> Save As -> STL, units: millimeters)
-2. Copy to `src/dog_description/meshes/`
-3. In `dog.urdf.xacro`, reference with scale `0.001 0.001 0.001` (mm -> m):
-   ```xml
-   <mesh filename="package://dog_description/meshes/part.stl" scale="0.001 0.001 0.001"/>
-   ```
-4. Adjust `<origin xyz="..." rpy="..."/>` in the `<visual>` block to align with the joint frame
-5. Keep `<collision>` geometry as simplified primitives (spheres/boxes) — never use STL for collision
+## Русский
 
-> **Note on mirroring:** Right-side legs (FR, RR) are mirror images of left-side legs.
-> Negative scale (e.g. `scale="-0.001 0.001 0.001"`) inverts normals in Gazebo Classic and
-> causes rendering artifacts. Export a separate mirrored STL from SolidWorks for each mirrored part.
+### Возможности
 
----
-
-## Known Issues
-
-| Issue | Status | Notes |
-|---|---|---|
-| Forward sliding ~40 mm/s when standing | Open | SetPosition mode in Gazebo Classic creates non-physical constraint forces with a forward bias on bent legs. PID torque control eliminates it but requires careful tuning to avoid instability at spawn. |
-| Right-side mesh orientation | Open | FR/RR legs show wrong STL orientation — need mirrored STL from SolidWorks |
-
----
-
-## Implementation Notes
-
-### IK sign convention
-
-Thigh joint axis is `xyz="0 1 0"`. Positive thigh angle moves the foot tip in the **-X direction** (backward in the world frame). The FK formula uses `foot.x = +L*sin(thigh)`, but this value is **physically backward**. For forward motion, `total_x` must be negated in the trajectory generator.
-
-### xacro and `|` character
-
-`xacro.process_file().toxml()` adds an autogenerated header containing `|` characters. This breaks `gazebo_ros2_control`'s in-process `rcl` argument parser. The launch file strips them:
-
-```python
-robot_description_str = xacro.process_file(urdf_file).toxml().replace('|', '')
-```
-
-All URDF comments must also be ASCII-only (no Cyrillic, no Unicode arrows).
-
-### Spawn and initial\_value matching
-
-`initial_value` in the URDF `<ros2_control>` block must match the physical joint position at spawn.
-Gazebo Classic `spawn_entity.py` does not support `-J` flags, so joints land at their rest/limit positions.
-Current spawn: `thigh=0.0` (rest), `shin=-0.1` (clamped to upper limit).
-Mismatch causes large controller error at activation -> robot flips.
-
-### implicitSpringDamper
-
-All joints have `<implicitSpringDamper>true</implicitSpringDamper>` in their `<gazebo reference>` blocks. This requires `<dynamics damping="X"/>` on the joint to take effect — without it, Gazebo checks `damping==0` and skips. When active, it provides continuous viscous damping at every ODE substep, reducing micro-oscillation between controller updates.
-
-### Foot contact
-
-Only the foot sphere (radius 0.03 m at shin tip) has collision geometry. No collision on thigh or shin body — this prevents spurious contacts from leg links scraping the ground.
-
----
-
----
-
-# ROS 2 Quadruped Robot — Dog Simulation (RU)
-
-Модульная симуляция четвероногого робота (12 степеней свободы) в ROS 2 / Gazebo Classic с контроллером походки (рысь), аналитической обратной кинематикой и стабилизацией по IMU.
-
----
-
-## Возможности
-
-- Чистая C++ библиотека кинематики и походки без зависимостей от ROS — переносима на реальное железо
+- Чистая C++ библиотека кинематики и походки (`dog_brain_lib`) без зависимостей от ROS — переносима на реальное железо
 - 12 суставов: 4 ноги x 3 DoF (hip\_roll, thigh\_pitch, shin\_pitch)
-- Аналитическая прямая и обратная кинематика
-- Рысь (trot gait) с настраиваемым периодом, duty factor и параметрами шага
-- Плавный разгон при старте: smoothstep от позы спавна до стойки (без рывков)
-- Стабилизация по крену/тангажу через IMU (опционально)
-- Настройка параметров в реальном времени через `ros2 param set`
-- STL-меши из SolidWorks для визуализации
-- Ground truth одометрия через `libgazebo_ros_p3d`
+- Аналитическая IK/FK для каждой ноги
+- Рысь (trot) с настраиваемым периодом, duty factor и параметрами шага
+- Плавный старт: smoothstep-рамп от позы спавна до стойки (без рывков)
+- Стабилизация крена/тангажа по IMU (опционально)
+- Настройка параметров на лету через `ros2 param set`
+- STL-меши из SolidWorks
+- Ground truth одометрия через `libgazebo_ros_p3d` (топик `/ground_truth/state`)
 
----
-
-## Требования
+### Требования
 
 | Зависимость | Версия |
 |---|---|
@@ -374,8 +264,6 @@ Only the foot sphere (radius 0.03 m at shin tip) has collision geometry. No coll
 | gazebo\_ros2\_control | Humble |
 | colcon | latest |
 
-Установка ROS-пакетов:
-
 ```bash
 sudo apt install \
   ros-humble-gazebo-ros2-control \
@@ -386,85 +274,58 @@ sudo apt install \
   ros-humble-joint-state-broadcaster
 ```
 
----
-
-## Быстрый старт
-
-### Клонирование
+### Быстрый старт
 
 ```bash
+# Клонирование
 mkdir -p ~/dog_ws/src
 cd ~/dog_ws/src
 git clone https://github.com/Maskayk/ros2_dog_ws.git .
 cd ~/dog_ws
-```
 
-### Сборка
-
-```bash
-cd ~/dog_ws
+# Сборка (--symlink-install для горячей подгрузки конфигов)
 colcon build --symlink-install
-```
 
-`--symlink-install` — обязательный флаг: создаёт симлинки на конфиги (YAML, launch, meshes), чтобы изменения применялись без пересборки.
-
-### Инициализация окружения
-
-```bash
+# Инициализация окружения
 source ~/dog_ws/install/setup.bash
+# (добавить в ~/.bashrc для автозапуска)
 ```
 
-Для автоматической инициализации при каждом запуске терминала:
+### Запуск
 
 ```bash
-echo "source ~/dog_ws/install/setup.bash" >> ~/.bashrc
-```
-
----
-
-## Запуск симуляции
-
-### Полная симуляция (Gazebo + контроллеры + походка)
-
-```bash
+# Полная симуляция (Gazebo + контроллеры + походка)
 ros2 launch dog_bringup gazebo.launch.py
+
+# Просмотр URDF (только RViz)
+ros2 launch dog_description view_dog.launch.py
 ```
 
-Последовательность запуска:
+### Последовательность запуска
 
 ```
 robot_state_publisher
         |
-      Gazebo
+      Gazebo (ODE @ 2 кГц, шаг=0.5 мс)
         |
-   spawn_entity  (z=0.33)
+   spawn_entity  (z=0.42, свободное падение ~4 с)
         |
 joint_state_broadcaster
         |
-joint_group_position_controller  (позиционное управление @ 100 Гц)
+joint_group_position_controller  (SetPosition @ 200 Гц)
         |
-   [задержка 4 с — робот приземляется]
+   [задержка 4 с — приземление]
         |
-    trot_node  (походка @ 50 Гц)
+    trot_node  (цикл походки @ 50 Гц)
 ```
 
-После запуска робот автоматически:
-1. Спавнится у земли (`z = 0.33`, ноги почти касаются)
-2. Позиционный контроллер удерживает суставы спавна (`thigh=0.0, shin=-0.1`)
-3. Через 4 с запускается `trot_node`, плавно переводит в стойку (1.5 с smoothstep)
-4. Стоит на месте до получения команды `/cmd_vel`
+После запуска:
+1. Робот спавнится на `z=0.42`, падает и приземляется (~4 с)
+2. Позиционный контроллер удерживает суставы спавна (`thigh=0.0, shin=-0.1`) — нулевая начальная ошибка
+3. Запускается `trot_node`, плавно переводит в стойку за 1.5 с (smoothstep)
+4. Стоит на месте до получения `/cmd_vel`
 
-### Просмотр URDF (RViz)
-
-```bash
-ros2 launch dog_description view_dog.launch.py
-```
-
----
-
-## Управление
-
-### Команды скорости
+### Управление
 
 ```bash
 # Вперёд 0.3 м/с
@@ -473,205 +334,130 @@ ros2 topic pub /cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.3}}"
 # Поворот влево
 ros2 topic pub /cmd_vel geometry_msgs/msg/Twist "{angular: {z: 0.5}}"
 
-# Стоп (или просто перестать публиковать — через 0.5 с скорость обнулится)
+# Стоп (или перестать публиковать — через 0.5 с скорость обнулится)
 ros2 topic pub /cmd_vel geometry_msgs/msg/Twist "{}"
 ```
 
-### Настройка параметров в реальном времени
+Настройка параметров на лету:
 
 ```bash
 ros2 param set /trot_node gait.period 0.6
 ros2 param set /trot_node trajectory.step_height 0.06
-ros2 param set /trot_node trajectory.step_amp_x 0.08
 ros2 param set /trot_node stabilization.enabled true
 ```
 
-Все параметры описаны в [`src/dog_brain/config/gait_params.yaml`](src/dog_brain/config/gait_params.yaml).
+### Архитектура
 
----
-
-## Архитектура
-
-### Поток данных
-
+**Поток данных:**
 ```
-/cmd_vel  ───────────────────────────────────────────┐
-                                                      v
-/imu/data ──> [body_controller]           [trot_node @ 50 Гц]
-                                                      |
-                                 /joint_group_position_controller/commands
-                                                      |
-                                                      v
-                           [gazebo_ros2_control позиционное упр. @ 100 Гц]
-                                                      |
-                                                      v
-                                        [Gazebo ODE @ 1 кГц]
-                                                      |
-                                                      v
-                                               /joint_states
+/cmd_vel ──────────────────────────────────────┐
+                                                v
+/imu/data ──> [body_controller]     [trot_node @ 50 Гц]
+                                                |
+                           /joint_group_position_controller/commands
+                                                |
+                                                v
+                        [gazebo_ros2_control SetPosition @ 200 Гц]
+                                                |
+                                                v
+                                 [Gazebo ODE @ 2 кГц, шаг=0.5 мс]
+                                                |
+                                                v
+                                         /joint_states
 ```
 
-### Структура пакетов
-
+**Структура пакетов:**
 ```
 dog_ws/src/
-├── dog_description/              # Модель робота
-│   ├── urdf/
-│   │   └── dog.urdf.xacro       # Описание робота (xacro-макрос)
-│   ├── meshes/
-│   │   ├── leg11.STL             # Меш голени (SolidWorks)
-│   │   └── leg22.STL             # Меш бедра (SolidWorks)
-│   ├── config/
-│   │   └── view_dog.rviz        # Конфиг RViz
-│   └── launch/
-│       └── view_dog.launch.py
-│
-├── dog_bringup/                  # Запуск симуляции
-│   ├── launch/
-│   │   └── gazebo.launch.py     # Главный launch-файл
-│   ├── config/
-│   │   └── controllers.yaml     # Тип контроллера, список суставов
-│   └── worlds/
-│       └── dog.world            # Мир Gazebo (физика ODE)
-│
-└── dog_brain/                    # Контроллер походки
+├── dog_description/          # Модель робота (URDF/xacro, STL-меши)
+├── dog_bringup/              # Запуск, конфиг контроллеров, мир
+└── dog_brain/                # Контроллер походки (C++ библиотека + ROS-нода)
     ├── include/dog_brain/
-    │   ├── types.hpp             # RobotGeometry, LegJoints, FootPosition
-    │   ├── leg_kinematics.hpp    # solveIK(), solveFK()
-    │   ├── gait_generator.hpp    # Фазы ног — рысь: {0, 0.5, 0.5, 0}
-    │   ├── foot_trajectory.hpp   # Траектории переноса и опоры
-    │   └── body_controller.hpp   # IMU -> коррекции для каждой ноги
-    ├── src/
-    │   ├── leg_kinematics.cpp
-    │   ├── gait_generator.cpp
-    │   ├── foot_trajectory.cpp
-    │   ├── body_controller.cpp
-    │   └── trot_node.cpp         # ROS 2 нода (тонкая обёртка)
-    └── config/
-        └── gait_params.yaml      # Настраиваемые параметры
+    │   ├── types.hpp         # Геометрия, LegJoints, FootPosition
+    │   ├── leg_kinematics.hpp # solveIK(), solveFK()
+    │   ├── gait_generator.hpp # Фазы — рысь: {0, 0.5, 0.5, 0}
+    │   ├── foot_trajectory.hpp # Траектории переноса и опоры
+    │   └── body_controller.hpp # IMU -> коррекции Z/X на ногу
+    └── src/trot_node.cpp     # ROS-нода: параметры, таймер, публикация
 ```
 
-### Модули `dog_brain`
+**Роли модулей:**
 
 | Модуль | Назначение |
 |---|---|
-| `types.hpp` | Все общие структуры данных и константы геометрии |
-| `leg_kinematics` | Аналитическая IK и FK для 3-DoF ноги |
-| `gait_generator` | Вычисление фазы каждой ноги из времени и параметров походки |
-| `foot_trajectory` | Перенос (smoothstep-X + полином-Z) и опора (линейный откат) |
-| `body_controller` | Кватернион IMU -> углы Эйлера -> Z/X коррекции на ногу |
-| `trot_node` | ROS-подписки/публикации, загрузка параметров, таймер 50 Гц |
+| `types.hpp` | Общие структуры, константы геометрии, массивы знаков ног |
+| `leg_kinematics` | Аналитическая IK/FK для 3-DoF ноги |
+| `gait_generator` | Фаза каждой ноги из времени и параметров походки |
+| `foot_trajectory` | Перенос (smoothstep-X, полином-Z), опора (линейный откат) |
+| `body_controller` | Кватернион IMU -> Эйлер -> коррекции Z/X на ногу |
+| `trot_node` | Тонкая ROS-обёртка: подписки, параметры, таймер 50 Гц |
 
----
-
-## Геометрия робота
+### Геометрия робота
 
 | Параметр | Значение |
 |---|---|
-| Длина звена бедра (hip) | 0.06 м |
-| Длина звена бедренной кости (thigh) | 0.144 м |
-| Длина звена голени (shin) | 0.1525 м |
-| Длина корпуса (trunk) | 0.475 м |
-| Ширина корпуса | 0.18 м |
-| Высота корпуса | 0.10 м |
+| Звено тазобедренного (hip) | 0.06 м |
+| Звено бедра (thigh) | 0.144 м |
+| Звено голени (shin) | 0.1525 м |
+| Корпус (Д x Ш x В) | 0.475 x 0.18 x 0.10 м |
 | Масса корпуса | 6.0 кг |
-| Масса звеньев ног | 0.5 кг (бедро, голень), 0.2 кг (тазобедренное) |
-| Радиус сферы стопы | 0.03 м |
-| Высота стойки (`z_nominal`) | -0.25 м |
+| Масса звеньев ног | 0.5 кг (бедро, голень), 0.2 кг (hip) |
+| Сфера стопы | r = 0.03 м |
+| Высота стойки (z\_nominal) | -0.25 м |
 | Общая масса | ~10.8 кг |
 
-**Порядок суставов** (массивы из 12 элементов в `controllers.yaml` и `types.hpp`):
+**Порядок суставов** (массивы из 12 элементов):
 ```
-FL_hip, FL_thigh, FL_shin,
-FR_hip, FR_thigh, FR_shin,
-RL_hip, RL_thigh, RL_shin,
-RR_hip, RR_thigh, RR_shin
+FL_hip, FL_thigh, FL_shin,  FR_hip, FR_thigh, FR_shin,
+RL_hip, RL_thigh, RL_shin,  RR_hip, RR_thigh, RR_shin
 ```
 
----
+### Параметры походки
 
-## Параметры походки
+Все в `src/dog_brain/config/gait_params.yaml`, изменяемые на лету.
 
-Все параметры находятся в `src/dog_brain/config/gait_params.yaml` и могут быть изменены во время работы.
-
-| Параметр | По умолчанию | Описание |
+| Параметр | По умолч. | Описание |
 |---|---|---|
-| `gait.period` | 0.8 с | Длительность полного цикла походки |
-| `gait.duty_factor` | 0.6 | Доля цикла в фазе опоры (60%) |
-| `trajectory.z_nominal` | -0.25 м | Номинальная высота стопы (глубина стойки) |
-| `trajectory.x_standing` | 0.0 м | Смещение стопы по X (должно быть 0 во избежание скольжения) |
-| `trajectory.step_height` | 0.04 м | Максимальный подъём стопы при переносе |
-| `trajectory.step_amp_x` | 0.06 м | Масштаб амплитуды шага вперёд |
-| `trajectory.yaw_lever` | 0.08 м | Плечо для вычисления поворота |
-| `startup.ramp_duration` | 1.5 с | Smoothstep-рамп от позы спавна до стойки |
-| `startup.settle_time` | 0.5 с | Удержание стойки перед приёмом cmd\_vel |
-| `cmd_vel_timeout` | 0.5 с | Обнуление скорости при отсутствии cmd\_vel |
+| `gait.period` | 0.8 с | Период полного цикла походки |
+| `gait.duty_factor` | 0.6 | Доля фазы опоры (60%) |
+| `trajectory.z_nominal` | -0.25 м | Глубина стойки |
+| `trajectory.x_standing` | 0.0 м | Смещение стопы X (держать 0) |
+| `trajectory.step_height` | 0.04 м | Подъём стопы при переносе |
+| `trajectory.step_amp_x` | 0.06 м | Масштаб шага вперёд |
+| `trajectory.yaw_lever` | 0.08 м | Плечо поворота |
+| `startup.ramp_duration` | 1.5 с | Рамп спавн -> стойка |
+| `startup.settle_time` | 0.5 с | Удержание перед походкой |
+| `cmd_vel_timeout` | 0.5 с | Обнуление при отсутствии cmd\_vel |
 
----
-
-## Последовательность запуска trot\_node
+### Запуск trot\_node
 
 | Фаза | Время | Действие |
 |---|---|---|
-| Рамп | 0 - 1.5 с | Smoothstep-интерполяция от позы спавна (thigh=0, shin=-0.1) до стойки |
+| Рамп | 0 - 1.5 с | Smoothstep от спавна (thigh=0, shin=-0.1) до стойки |
 | Удержание | 1.5 - 2.0 с | Удержание позы стойки |
-| Нормальная работа | 2.0 с+ | Приём /cmd\_vel; стоит при нулевой скорости, идёт при скорости выше порога |
+| Работа | 2.0 с+ | Приём /cmd\_vel; стоит или идёт |
 
----
+### Обновление STL-мешей
 
-## Обновление STL-мешей из SolidWorks
+1. Экспорт STL из SolidWorks (единицы: мм)
+2. Поместить в `src/dog_description/meshes/`
+3. Указать `scale="0.001 0.001 0.001"` (мм в м)
+4. `<collision>` — только простые примитивы (никогда STL)
+5. Зеркалирование: экспортировать отдельный зеркальный STL (отрицательный scale ломает нормали)
 
-1. Экспортировать каждую деталь как STL из SolidWorks (File -> Save As -> STL, единицы: миллиметры)
-2. Скопировать в `src/dog_description/meshes/`
-3. В `dog.urdf.xacro` указать масштаб `0.001 0.001 0.001` (мм -> м):
-   ```xml
-   <mesh filename="package://dog_description/meshes/part.stl" scale="0.001 0.001 0.001"/>
-   ```
-4. Подогнать `<origin xyz="..." rpy="..."/>` в блоке `<visual>` для выравнивания с системой координат сустава
-5. Для `<collision>` использовать упрощённые примитивы (сферы/боксы) — никогда не использовать STL
+### Известные проблемы
 
-> **Зеркалирование:** Правые ноги (FR, RR) — зеркальные отражения левых.
-> Отрицательный масштаб (напр. `scale="-0.001 0.001 0.001"`) инвертирует нормали в Gazebo Classic.
-> Правильный подход — экспортировать отдельный зеркальный STL из SolidWorks.
+| Проблема | Описание |
+|---|---|
+| Дрейф вперёд ~20 мм/с при стойке | Артефакт SetPosition в Gazebo Classic на согнутых ногах. Снижен в 2 раза `max_step_size=0.0005`. Полное решение требует управления по моментам (effort control). |
+| Ориентация мешей правых ног | FR/RR ноги нуждаются в зеркальных STL из SolidWorks |
 
----
+### Технические детали
 
-## Известные проблемы
+**Знаки IK:** Ось thigh `xyz="0 1 0"`. Положительный угол = стопа идёт в -X (назад). FK: `foot.x = +L*sin(thigh)`, но физически это назад. Для движения вперёд `total_x` инвертируется.
 
-| Проблема | Статус | Описание |
-|---|---|---|
-| Скольжение вперёд ~40 мм/с при стойке | Открыта | Режим SetPosition в Gazebo Classic создаёт нефизичные силы на согнутых ногах. PID-управление по моментам устраняет эффект, но требует тщательной настройки. |
-| Ориентация мешей правых ног | Открыта | FR/RR ноги показывают неправильную ориентацию STL — нужны зеркальные STL из SolidWorks |
+**Фикс xacro `|`:** `xacro.process_file().toxml()` добавляет `|` в заголовок, что ломает `gazebo_ros2_control`. Launch-файл удаляет: `.replace('|', '')`. Комментарии в URDF — только ASCII.
 
----
+**Соответствие initial\_value:** `initial_value` в `<ros2_control>` должен совпадать с физической позой спавна. Сейчас: `thigh=0.0, shin=-0.1` (shin зажат верхним лимитом). Несовпадение = переворот.
 
-## Технические детали
-
-### Соглашение о знаках IK
-
-Ось тазобедренного сустава (thigh) — `xyz="0 1 0"`. Положительный угол перемещает кончик стопы в направлении **-X** (назад в мировой СК). FK использует `foot.x = +L*sin(thigh)`, но это значение **физически направлено назад**. Для движения вперёд `total_x` должен быть отрицательным в генераторе траекторий.
-
-### xacro и символ `|`
-
-`xacro.process_file().toxml()` добавляет автогенерированный заголовок с символами `|`. Это ломает парсер аргументов `rcl` внутри `gazebo_ros2_control`. Launch-файл удаляет их:
-
-```python
-robot_description_str = xacro.process_file(urdf_file).toxml().replace('|', '')
-```
-
-Все комментарии в URDF должны быть только ASCII (без кириллицы и Unicode).
-
-### Соответствие initial\_value и позы спавна
-
-`initial_value` в блоке `<ros2_control>` URDF должен совпадать с физической позицией сустава при спавне.
-`spawn_entity.py` в Gazebo Classic не поддерживает флаги `-J`, поэтому суставы принимают позиции покоя/лимитов.
-Текущий спавн: `thigh=0.0` (покой), `shin=-0.1` (зажат верхним лимитом).
-Рассогласование вызывает большую ошибку контроллера при активации -> робот переворачивается.
-
-### implicitSpringDamper
-
-На всех суставах включён `<implicitSpringDamper>true</implicitSpringDamper>` через `<gazebo reference>`. Для его работы необходим `<dynamics damping="X"/>` на суставе в URDF — без него Gazebo проверяет `damping==0` и пропускает. При активации обеспечивает вязкое демпфирование на каждом подшаге ODE, уменьшая микроосцилляции между обновлениями контроллера.
-
-### Контакт стоп
-
-Только сфера стопы (радиус 0.03 м на кончике голени) имеет геометрию столкновений. На бедре и теле голени нет collision — это предотвращает ложные контакты звеньев ног с землёй.
+**Контакт стоп:** Только сфера стопы (r=0.03 на кончике голени) имеет коллизию. На бедре и теле голени коллизий нет — это предотвращает ложные контакты.
